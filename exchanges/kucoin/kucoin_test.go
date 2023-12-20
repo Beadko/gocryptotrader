@@ -36,7 +36,7 @@ const (
 	apiKey                  = ""
 	apiSecret               = ""
 	passPhrase              = ""
-	canManipulateRealOrders = false
+	canManipulateRealOrders = true
 )
 
 var (
@@ -60,9 +60,15 @@ func TestMain(m *testing.M) {
 	exchCfg.API.AuthenticatedSupport = true
 	exchCfg.API.AuthenticatedWebsocketSupport = true
 
-	exchCfg.API.Credentials.Key = apiKey
-	exchCfg.API.Credentials.Secret = apiSecret
-	exchCfg.API.Credentials.ClientID = passPhrase
+	if apiKey != "" {
+		exchCfg.API.Credentials.Key = apiKey
+	}
+	if apiSecret != "" {
+		exchCfg.API.Credentials.Secret = apiSecret
+	}
+	if passPhrase != "" {
+		exchCfg.API.Credentials.ClientID = passPhrase
+	}
 	if apiKey != "" && apiSecret != "" && passPhrase != "" {
 		ku.Websocket.SetCanUseAuthenticatedEndpoints(true)
 	}
@@ -101,18 +107,42 @@ func TestGetSymbols(t *testing.T) {
 
 func TestGetTicker(t *testing.T) {
 	t.Parallel()
-	_, err := ku.GetTicker(context.Background(), "BTC-USDT")
-	if err != nil {
-		t.Error("GetTicker() error", err)
-	}
+	ticker, err := ku.GetTicker(context.Background(), "BTC-USDT")
+	assert.NoError(t, err, "GetTicker should not error")
+	assert.NotEmpty(t, ticker.Sequence, "Sequence should not be empty")
+	assert.Positive(t, ticker.Price, "Price should be positive")
+	assert.Positive(t, ticker.Size, "Size should be positive")
+	assert.Positive(t, ticker.BestAsk, "BestAsk should be positive")
+	assert.Positive(t, ticker.BestAskSize, "BestAskSize should be positive")
+	assert.Positive(t, ticker.BestBid, "BestBid should be positive")
+	assert.Positive(t, ticker.BestBidSize, "BestBidSize should be positive")
+	assert.NotEmpty(t, ticker.Time, "Time should not be empty")
 }
 
 func TestGetAllTickers(t *testing.T) {
 	t.Parallel()
-	_, err := ku.GetTickers(context.Background())
-	if err != nil {
-		t.Error("GetAllTickers() error", err)
+	tickers, err := ku.GetTickers(context.Background())
+	assert.NoError(t, err, "GetTickers should not error")
+	assert.NotEmpty(t, tickers.Time, "Time should not be empty")
+	for _, tick := range tickers.Tickers {
+		assert.NotEmpty(t, tick.Symbol, "Symbol should not be empty")
+		assert.NotEmpty(t, tick.SymbolName, "SymbolName should not be empty")
+		assert.Positive(t, tick.Buy, "Buy should be positive")
+		assert.Positive(t, tick.Sell, "Sell should be positive")
+		assert.NotEmpty(t, tick.ChangeRate, "ChangeRate should not be empty")
+		assert.NotEmpty(t, tick.ChangePrice, "ChangePrice should not be empty")
+		assert.Positive(t, tick.High, "High should be positive")
+		assert.Positive(t, tick.Low, "Low should be positive")
+		assert.Positive(t, tick.Volume, "Volume should be positive")
+		assert.Positive(t, tick.VolumeValue, "VolumeValue should be positive")
+		assert.Positive(t, tick.Last, "Last should be positive")
+		assert.Positive(t, tick.AveragePrice, "AveragePrice should be positive")
+		assert.Positive(t, tick.TakerFeeRate, "TakerFeeRate should be positive")
+		assert.Positive(t, tick.MakerFeeRate, "MakerFeeRate should be positive")
+		assert.Positive(t, tick.TakerCoefficient, "TakerCoefficient should be positive")
+		assert.Positive(t, tick.MakerCoefficient, "MakerCoefficient should be positive")
 	}
+
 }
 
 func TestGet24hrStats(t *testing.T) {
