@@ -147,86 +147,165 @@ func TestGetAllTickers(t *testing.T) {
 
 func TestGet24hrStats(t *testing.T) {
 	t.Parallel()
-	_, err := ku.Get24hrStats(context.Background(), "BTC-USDT")
-	if err != nil {
-		t.Error("Get24hrStats() error", err)
-	}
+	st, err := ku.Get24hrStats(context.Background(), "BTC-USDT")
+	assert.NoError(t, err, "Get24hrStats should not error")
+	assert.NotEmpty(t, st.Time, "Time should not be empty")
+	assert.Positive(t, st.Buy, "Buy should be positive")
+	assert.Positive(t, st.Sell, "Sell should be positive")
+	assert.NotEmpty(t, st.ChangeRate, "ChangeRate should not be empty")
+	assert.NotEmpty(t, st.ChangePrice, "ChangePrice should not be empty")
+	assert.Positive(t, st.High, "High should be positive")
+	assert.Positive(t, st.Low, "Low should be positive")
+	assert.Positive(t, st.Volume, "Volume should be positive")
+	assert.Positive(t, st.VolumeValue, "VolumeValue should be positive")
+	assert.Positive(t, st.Last, "Last should be positive")
+	assert.Positive(t, st.AveragePrice, "AveragePrice should be positive")
+	assert.Positive(t, st.TakerFeeRate, "TakerFeeRate should be positive")
+	assert.Positive(t, st.MakerFeeRate, "MakerFeeRate should be positive")
+	assert.Positive(t, st.TakerCoefficient, "TakerCoefficient should be positive")
+	assert.Positive(t, st.MakerCoefficient, "MakerCoefficient should be positive")
 }
 
 func TestGetMarketList(t *testing.T) {
 	t.Parallel()
-	_, err := ku.GetMarketList(context.Background())
-	if err != nil {
-		t.Error("GetMarketList() error", err)
-	}
+	ml, err := ku.GetMarketList(context.Background())
+	assert.NoError(t, err, "GetMarketList should not error")
+	assert.NotEmpty(t, ml, "MarketList should not be empty")
 }
 
 func TestGetPartOrderbook20(t *testing.T) {
 	t.Parallel()
-	_, err := ku.GetPartOrderbook20(context.Background(), "BTC-USDT")
-	if err != nil {
-		t.Error("GetPartOrderbook20() error", err)
+	pob, err := ku.GetPartOrderbook20(context.Background(), "BTC-USDT")
+	assert.NoError(t, err, "GetPartOrderbook20 should not error")
+	assert.NotEmpty(t, pob.Sequence, "Sequence should not be empty")
+	assert.NotEmpty(t, pob.Time, "Time should not be empty")
+	for _, bids := range pob.Bids {
+		assert.Positive(t, bids.Amount, "Bid Amount should be positive")
+	}
+	for _, asks := range pob.Asks {
+		assert.Positive(t, asks.Amount, "Ask Amount should be positive")
 	}
 }
 
 func TestGetPartOrderbook100(t *testing.T) {
 	t.Parallel()
-	_, err := ku.GetPartOrderbook100(context.Background(), "BTC-USDT")
-	if err != nil {
-		t.Error("GetPartOrderbook100() error", err)
+	pob, err := ku.GetPartOrderbook100(context.Background(), "BTC-USDT")
+	assert.NoError(t, err, "GetPartOrderbook100 should not error")
+	assert.NotEmpty(t, pob.Sequence, "Sequence should not be empty")
+	assert.NotEmpty(t, pob.Time, "Time should not be empty")
+	for _, bids := range pob.Bids {
+		assert.Positive(t, bids.Amount, "Bid Amount should be positive")
+	}
+	for _, asks := range pob.Asks {
+		assert.Positive(t, asks.Amount, "Ask Amount should be positive")
 	}
 }
 
 func TestGetOrderbook(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku)
-	_, err := ku.GetOrderbook(context.Background(), "BTC-USDT")
-	if err != nil {
-		t.Error("GetOrderbook() error", err)
+	ob, err := ku.GetOrderbook(context.Background(), "BTC-USDT")
+	assert.NoError(t, err, "GetOrderbook should not error")
+	assert.NotEmpty(t, ob.Sequence, "Sequence should not be empty")
+	assert.NotEmpty(t, ob.Time, "Time should not be empty")
+	for _, bids := range ob.Bids {
+		assert.Positive(t, bids.Amount, "Bid Amount should be positive")
+	}
+	for _, asks := range ob.Asks {
+		assert.Positive(t, asks.Amount, "Ask Amount should be positive")
 	}
 }
 
 func TestGetTradeHistory(t *testing.T) {
 	t.Parallel()
-	_, err := ku.GetTradeHistory(context.Background(), "BTC-USDT")
-	if err != nil {
-		t.Error("GetTradeHistory() error", err)
+	h, err := ku.GetTradeHistory(context.Background(), "BTC-USDT")
+	assert.NoError(t, err, "GetTradeHistory should not error")
+	for _, res := range h {
+		assert.NotEmpty(t, res.Sequence, "Sequence should not be empty")
+		assert.Positive(t, res.Price, "Price should be positive")
+		assert.Positive(t, res.Size, "Size should be positive")
+		assert.NotEmpty(t, res.Time, "Time should not be empty")
 	}
 }
 
 func TestGetKlines(t *testing.T) {
 	t.Parallel()
-	_, err := ku.GetKlines(context.Background(), "BTC-USDT", "1week", time.Time{}, time.Time{})
-	if err != nil {
-		t.Error("GetKlines() error", err)
+	c, err := ku.GetKlines(context.Background(), "BTC-USDT", "1week", time.Time{}, time.Time{})
+	assert.NoError(t, err, "GetKlines 1 week should not error")
+	assert.NotEmpty(t, c, "Candle data should not be empty")
+	for _, res := range c {
+		assert.NotEmpty(t, res.StartTime, "StartTime should not be empty")
+		assert.Positive(t, res.Open, "Opening price should be positive")
+		assert.Positive(t, res.Close, "Closing price should be positive")
+		assert.Positive(t, res.High, "Highest price should be positive")
+		assert.Positive(t, res.Low, "Lowest price should be positive")
+		assert.Positive(t, res.Volume, "Volume should be positive")
+		assert.Positive(t, res.Amount, "Amount should be positive")
 	}
-	_, err = ku.GetKlines(context.Background(), "BTC-USDT", "5min", time.Now().Add(-time.Hour*1), time.Now())
-	if err != nil {
-		t.Error("GetKlines() error", err)
+
+	c, err = ku.GetKlines(context.Background(), "BTC-USDT", "5min", time.Now().Add(-time.Hour*1), time.Now())
+	assert.NoError(t, err, "GetKlines 5min should not error")
+	assert.NotEmpty(t, c, "Candle data should not be empty")
+	for _, res := range c {
+		assert.NotEmpty(t, res.StartTime, "StartTime should not be empty")
+		assert.Positive(t, res.Open, "Opening price should be positive")
+		assert.Positive(t, res.Close, "Closing price should be positive")
+		assert.Positive(t, res.High, "Highest price should be positive")
+		assert.Positive(t, res.Low, "Lowest price should be positive")
+		assert.Positive(t, res.Volume, "Volume should be positive")
+		assert.Positive(t, res.Amount, "Amount should be positive")
 	}
 }
 
 func TestGetCurrencies(t *testing.T) {
 	t.Parallel()
-	_, err := ku.GetCurrencies(context.Background())
-	if err != nil {
-		t.Error("GetCurrencies() error", err)
+	c, err := ku.GetCurrencies(context.Background())
+	assert.NoError(t, err, "GetCurrencies should not error")
+	for _, res := range c {
+		assert.NotEmpty(t, res.Currency, "Currency should not be empty")
+		assert.NotEmpty(t, res.FullName, "FullName should not be empty")
+		assert.NotEmpty(t, res.Currency, "Currency should not be empty")
+		assert.NotEmpty(t, res.Name, "Name should not be empty")
+		assert.Positive(t, res.Confirms, "Confirms should be positive")
+		assert.IsType(t, true, res.IsDebitEnabled, "IsDebitEnabled should be true or false")
+		assert.IsType(t, true, res.IsMarginEnabled, "IsMarginEnabled should be true or false")
+		assert.IsType(t, true, res.IsWithdrawEnabled, "IsWithdrawEnabled should be true or false")
+		assert.IsType(t, true, res.IsDepositEnabled, "IsDepositEnabled should be true or false")
 	}
 }
 
 func TestGetCurrency(t *testing.T) {
 	t.Parallel()
-	_, err := ku.GetCurrencyDetail(context.Background(), "BTC", "")
-	if err != nil {
-		t.Error("GetCurrency() error", err)
+	c, err := ku.GetCurrencyDetail(context.Background(), "BTC", "")
+	assert.NoError(t, err, "GetCurrencyDetail should not error")
+	assert.NotEmpty(t, c.Currency, "Currency should not be empty")
+	assert.NotEmpty(t, c.FullName, "FullName should not be empty")
+	assert.NotEmpty(t, c.Currency, "Currency should not be empty")
+	assert.NotEmpty(t, c.Name, "Name should not be empty")
+	for _, res := range c.Chains {
+		assert.Positive(t, res.Confirms, "Confirms should be positive")
+		assert.NotEmpty(t, res.Name, "Name should not be empty")
+		assert.IsType(t, true, res.IsWithdrawEnabled, "IsWithdrawEnabled should be true or false")
+		assert.IsType(t, true, res.IsDepositEnabled, "IsDepositEnabled should be true or false")
+		assert.Positive(t, res.WithdrawalMinFee, "WithdrawalMinFee should be positive")
+		assert.Positive(t, res.WithdrawalMinSize, "WithdrawalMinSize should be positive")
 	}
 
-	_, err = ku.GetCurrencyDetail(context.Background(), "BTC", "ETH")
-	if err != nil {
-		t.Error("GetCurrency() error", err)
+	c, err = ku.GetCurrencyDetail(context.Background(), "BTC", "ETH")
+	assert.NoError(t, err, "GetCurrencyDetail should not error")
+	assert.NotEmpty(t, c.Currency, "Currency should not be empty")
+	assert.NotEmpty(t, c.FullName, "FullName should not be empty")
+	assert.NotEmpty(t, c.Currency, "Currency should not be empty")
+	assert.NotEmpty(t, c.Name, "Name should not be empty")
+	for _, res := range c.Chains {
+		assert.Positive(t, res.Confirms, "Confirms should be positive")
+		assert.NotEmpty(t, res.Name, "Name should not be empty")
+		assert.IsType(t, true, res.IsWithdrawEnabled, "IsWithdrawEnabled should be true or false")
+		assert.IsType(t, true, res.IsDepositEnabled, "IsDepositEnabled should be true or false")
+		assert.Positive(t, res.WithdrawalMinFee, "WithdrawalMinFee should be positive")
+		assert.Positive(t, res.WithdrawalMinSize, "WithdrawalMinSize should be positive")
 	}
 }
-
 func TestGetFiatPrice(t *testing.T) {
 	t.Parallel()
 	_, err := ku.GetFiatPrice(context.Background(), "", "")
