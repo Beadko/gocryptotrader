@@ -309,52 +309,70 @@ func TestGetCurrency(t *testing.T) {
 func TestGetFiatPrice(t *testing.T) {
 	t.Parallel()
 	_, err := ku.GetFiatPrice(context.Background(), "", "")
-	if err != nil {
-		t.Error("GetFiatPrice() error", err)
-	}
+	assert.NoError(t, err, "GetFiatPrice should not error")
 
 	_, err = ku.GetFiatPrice(context.Background(), "EUR", "ETH,BTC")
-	if err != nil {
-		t.Error("GetFiatPrice() error", err)
-	}
+	assert.NoError(t, err, "GetFiatPrice should not error")
 }
 
 func TestGetMarkPrice(t *testing.T) {
 	t.Parallel()
-	_, err := ku.GetMarkPrice(context.Background(), "USDT-BTC")
-	if err != nil {
-		t.Error("GetMarkPrice() error", err)
-	}
+	mp, err := ku.GetMarkPrice(context.Background(), "USDT-BTC")
+	assert.NoError(t, err, "GetMarkPrice should not error")
+	assert.NotEmpty(t, mp.Symbol, "Symbol should not be empty")
+	assert.NotEmpty(t, mp.TimePoint, "TimePoint should not be empty")
+	assert.Positive(t, mp.Value, "Value should be positive")
 }
 
 func TestGetMarginConfiguration(t *testing.T) {
 	t.Parallel()
-	_, err := ku.GetMarginConfiguration(context.Background())
-	if err != nil {
-		t.Error("GetMarginConfiguration() error", err)
-	}
+	mc, err := ku.GetMarginConfiguration(context.Background())
+	assert.NoError(t, err, "GetMarginConfiguration should not error")
+	assert.NotEmpty(t, mc.CurrencyList, "CurrencyList should not be empty")
+	assert.Positive(t, mc.LiqDebtRatio, "LiqDebtRatio should be positive")
+	assert.Positive(t, mc.MaxLeverage, "MaxLeverage should be positive")
+	assert.Positive(t, mc.WarningDebtRatio, "WarningDebtRatio should be positive")
 }
 
+// can't test as margin trading is not enabled
 func TestGetMarginAccount(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku)
-	_, err := ku.GetMarginAccount(context.Background())
-	if err != nil {
-		t.Error("GetMarginAccount() error", err)
+	a, err := ku.GetMarginAccount(context.Background())
+	assert.NoError(t, err, "GetMarginAccount should not error")
+	assert.Positive(t, a.DebtRatio, "DebtRatio should be positive")
+	for _, res := range a.Accounts {
+		assert.NotEmpty(t, res.Currency, "Currency should not be empty")
+		assert.Positive(t, res.AvailableBalance, "AvailableBalance should be positive")
+		assert.Positive(t, res.HoldBalance, "HoldBalance should be positive")
+		assert.Positive(t, res.Liability, "Liability should be positive")
+		assert.Positive(t, res.MaxBorrowSize, "MaxBorrowSize should be positive")
+		assert.Positive(t, res.TotalBalance, "TotalBalance should be positive")
 	}
 }
 
+// returning all values as empty
 func TestGetMarginRiskLimit(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku)
-	_, err := ku.GetMarginRiskLimit(context.Background(), "cross")
-	if err != nil {
-		t.Error("GetMarginRiskLimit() error", err)
+	rl, err := ku.GetMarginRiskLimit(context.Background(), "cross")
+	assert.NoError(t, err, "GetMarginRiskLimit should not error")
+	for _, res := range rl {
+		assert.NotEmpty(t, res.Currency, "Currency should not be empty")
+		assert.Positive(t, res.MaximumBorrowAmount, "MaximumBorrowAmount should be positive")
+		assert.Positive(t, res.MaximumHoldAmount, "MaximumHoldAmount should be positive")
+		assert.Positive(t, res.MaxumumBuyAmount, "MaxumumBuyAmount should be positive")
+		assert.Positive(t, res.Precision, "Precision should be positive")
 	}
 
-	_, err = ku.GetMarginRiskLimit(context.Background(), "isolated")
-	if err != nil {
-		t.Error("GetMarginRiskLimit() error", err)
+	rl, err = ku.GetMarginRiskLimit(context.Background(), "isolated")
+	assert.NoError(t, err, "GetMarginRiskLimit should not error")
+	for _, res := range rl {
+		assert.NotEmpty(t, res.Currency, "Currency should not be empty")
+		assert.Positive(t, res.MaximumBorrowAmount, "MaximumBorrowAmount should be positive")
+		assert.Positive(t, res.MaximumHoldAmount, "MaximumHoldAmount should be positive")
+		assert.Positive(t, res.MaxumumBuyAmount, "MaxumumBuyAmount should be positive")
+		assert.Positive(t, res.Precision, "Precision should be positive")
 	}
 }
 
