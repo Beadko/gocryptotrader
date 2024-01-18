@@ -59,10 +59,15 @@ func TestMain(m *testing.M) {
 
 	exchCfg.API.AuthenticatedSupport = true
 	exchCfg.API.AuthenticatedWebsocketSupport = true
-
-	exchCfg.API.Credentials.Key = apiKey
-	exchCfg.API.Credentials.Secret = apiSecret
-	exchCfg.API.Credentials.ClientID = passPhrase
+	if apiKey != "" {
+		exchCfg.API.Credentials.Key = apiKey
+	}
+	if apiSecret != "" {
+		exchCfg.API.Credentials.Secret = apiSecret
+	}
+	if passPhrase != "" {
+		exchCfg.API.Credentials.ClientID = passPhrase
+	}
 	if apiKey != "" && apiSecret != "" && passPhrase != "" {
 		ku.Websocket.SetCanUseAuthenticatedEndpoints(true)
 	}
@@ -274,9 +279,7 @@ func TestGetBorrowOrder(t *testing.T) {
 	}
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku)
 	_, err = ku.GetBorrowOrder(context.Background(), "orderID")
-	if err != nil {
-		t.Error("GetBorrowOrder() error", err)
-	}
+	assert.NoError(t, err, "GetBorrowOrder should not error")
 }
 
 const outstandingRecordResponseJSON = `{"currentPage": 0, "pageSize": 0, "totalNum": 0, "totalPage": 0, "items": [ { "tradeId": "1231141", "currency": "USDT", "accruedInterest": "0.22121", "dailyIntRate": "0.0021", "liability": "1.32121", "maturityTime": "1544657947759", "principal": "1.22121", "repaidSize": "0", "term": 7, "createdAt": "1544657947759" } ] }`
