@@ -376,22 +376,24 @@ func TestGetMarginRiskLimit(t *testing.T) {
 	}
 }
 
+// can't test as margin trading is not enabled
 func TestPostBorrowOrder(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku, canManipulateRealOrders)
-	_, err := ku.PostBorrowOrder(context.Background(), "USDT", "FOK", "", 10, 0)
-	if err != nil {
-		t.Error("PostBorrowOrder() error", err)
-	}
+	o, err := ku.PostBorrowOrder(context.Background(), "USDT", "FOK", "", 10, 0)
+	assert.NoError(t, err, "PostBorrowOrder should not error")
+	assert.NotEmpty(t, o.Currency, "Currency should not be empty")
+	assert.NotEmpty(t, o.OrderID, "OrderId should not be empty")
 
 	_, err = ku.PostBorrowOrder(context.Background(), "USDT", "IOC", "7,14,28", 10, 0.05)
-	if err != nil {
-		t.Error("PostBorrowOrder() error", err)
-	}
+	assert.NoError(t, err, "PostBorrowOrder should not error")
+	assert.NotEmpty(t, o.Currency, "Currency should not be empty")
+	assert.NotEmpty(t, o.OrderID, "OrderId should not be empty")
 }
 
 const borrowOrderJSON = `{"orderId": "a2111213","currency": "USDT","size": "1.009","filled": 1.009,"matchList": [{"currency": "USDT","dailyIntRate": "0.001","size": "12.9","term": 7,"timestamp": "1544657947759","tradeId": "1212331"}],"status": "DONE"}`
 
+// error code: 404000 message: Not Found
 func TestGetBorrowOrder(t *testing.T) {
 	t.Parallel()
 	var resp *BorrowOrder
@@ -401,9 +403,8 @@ func TestGetBorrowOrder(t *testing.T) {
 	}
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku)
 	_, err = ku.GetBorrowOrder(context.Background(), "orderID")
-	if err != nil {
-		t.Error("GetBorrowOrder() error", err)
-	}
+	assert.NoError(t, err, "GetBorrowOrder should not error")
+
 }
 
 const outstandingRecordResponseJSON = `{"currentPage": 0, "pageSize": 0, "totalNum": 0, "totalPage": 0, "items": [ { "tradeId": "1231141", "currency": "USDT", "accruedInterest": "0.22121", "dailyIntRate": "0.0021", "liability": "1.32121", "maturityTime": "1544657947759", "principal": "1.22121", "repaidSize": "0", "term": 7, "createdAt": "1544657947759" } ] }`
@@ -416,9 +417,16 @@ func TestGetOutstandingRecord(t *testing.T) {
 		t.Error(err)
 	}
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku)
-	_, err = ku.GetOutstandingRecord(context.Background(), "BTC")
-	if err != nil {
-		t.Error("GetOutstandingRecord() error", err)
+	r, err := ku.GetOutstandingRecord(context.Background(), "BTC")
+	assert.NoError(t, err, "GetOutstandingRecord should not error")
+	assert.Positive(t, r.CurrentPage, "CurrentPage should be positive")
+	assert.Positive(t, r.PageSize, "PageSize should be positive")
+	for _, o := range r.Items {
+		assert.NotEmpty(t, o.baseRecord, "BaseRecord should not be empty")
+		assert.Positive(t, o.AccruedInterest, "AccruedInterest should be positive")
+		assert.Positive(t, o.Liability, "Liability should be positive")
+		assert.NotEmpty(t, o.MaturityTime, "MaturityTime should not be empty")
+		assert.NotEmpty(t, o.CreatedAt, "CreatedAt should not be empty")
 	}
 }
 
@@ -432,55 +440,56 @@ func TestGetRepaidRecord(t *testing.T) {
 		t.Error(err)
 	}
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku)
-	_, err = ku.GetRepaidRecord(context.Background(), "BTC")
-	if err != nil {
-		t.Error("GetRepaidRecord() error", err)
+	r, err := ku.GetRepaidRecord(context.Background(), "BTC")
+	assert.NoError(t, err, "GetRepaidRecord should not error")
+	assert.Positive(t, r.CurrentPage, "CurrentPage should be positive")
+	assert.Positive(t, r.PageSize, "PageSize should be positive")
+	for _, o := range r.Items {
+		assert.NotEmpty(t, o.baseRecord, "BaseRecord should not be empty")
+		assert.Positive(t, o.Interest, "Interest should be positive")
+		assert.NotEmpty(t, o.RepayTime, "RepayTime should not be empty")
 	}
 }
 
+// can't test as margin trading is not enabled
 func TestOneClickRepayment(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku, canManipulateRealOrders)
 	err := ku.OneClickRepayment(context.Background(), "BTC", "RECENTLY_EXPIRE_FIRST", 2.5)
-	if err != nil {
-		t.Error("OneClickRepayment() error", err)
-	}
+	assert.NoError(t, err, "OneClickRepayment should not error")
 }
 
+// can't test as margin trading is not enabled
 func TestSingleOrderRepayment(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku, canManipulateRealOrders)
 	err := ku.SingleOrderRepayment(context.Background(), "BTC", "fa3e34c980062c10dad74016", 2.5)
-	if err != nil {
-		t.Error("SingleOrderRepayment() error", err)
-	}
+	assert.NoError(t, err, "SingleOrderRepayment should not error")
 }
 
+// code: 210008 message: Crypto Lending is now Crypto Lending 2.0. Lend out crypto to earn interest.
 func TestPostLendOrder(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku, canManipulateRealOrders)
 	_, err := ku.PostLendOrder(context.Background(), "BTC", 0.0001, 5, 7)
-	if err != nil {
-		t.Error("PostLendOrder() error", err)
-	}
+	assert.NoError(t, err, "PostLendOrder should not error")
+
 }
 
+// code: 210005 message: order not exist
 func TestCancelLendOrder(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku, canManipulateRealOrders)
 	err := ku.CancelLendOrder(context.Background(), "OrderID")
-	if err != nil {
-		t.Error("CancelLendOrder() error", err)
-	}
+	assert.NoError(t, err, "CancelLendOrder should not error")
 }
 
+// code: 210008 message: Crypto Lending is now Crypto Lending 2.0. Lend out crypto to earn interest.
 func TestSetAutoLend(t *testing.T) {
 	t.Parallel()
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku, canManipulateRealOrders)
 	err := ku.SetAutoLend(context.Background(), "BTC", 0.0002, 0.005, 7, true)
-	if err != nil {
-		t.Error("SetAutoLend() error", err)
-	}
+	assert.NoError(t, err, "SetAutoLend should not error")
 }
 
 const activeOrderResponseJSON = `[ { "orderId": "5da59f5ef943c033b2b643e4", "currency": "BTC", "size": "0.51", "filledSize": "0", "dailyIntRate": "0.0001", "term": 7, "createdAt": 1571135326913 } ]`
@@ -493,14 +502,26 @@ func TestGetActiveOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	sharedtestvalues.SkipTestIfCredentialsUnset(t, ku)
-	_, err = ku.GetActiveOrder(context.Background(), "")
-	if err != nil {
-		t.Error("GetActiveOrder() error", err)
+	resp, err = ku.GetActiveOrder(context.Background(), "")
+	assert.NoError(t, err, "GetActiveOrder should not error")
+	for _, lo := range resp {
+		assert.NotEmpty(t, lo.OrderID, "OrderID should not be empty")
+		assert.NotEmpty(t, lo.Currency, "Currency should not be empty")
+		assert.Positive(t, lo.Size, "Size should be positive")
+		assert.Positive(t, lo.FilledSize, "FilledSize should be positive")
+		assert.Positive(t, lo.DailyIntRate, "DailyIntRate should be positive")
+		assert.NotEmpty(t, lo.CreatedAt, "CreatedAt should not be empty")
 	}
 
-	_, err = ku.GetActiveOrder(context.Background(), "BTC")
-	if err != nil {
-		t.Error("GetActiveOrder() error", err)
+	resp, err = ku.GetActiveOrder(context.Background(), "BTC")
+	assert.NoError(t, err, "GetActiveOrder should not error")
+	for _, lo := range resp {
+		assert.NotEmpty(t, lo.OrderID, "OrderID should not be empty")
+		assert.NotEmpty(t, lo.Currency, "Currency should not be empty")
+		assert.Positive(t, lo.Size, "Size should be positive")
+		assert.Positive(t, lo.FilledSize, "FilledSize should be positive")
+		assert.Positive(t, lo.DailyIntRate, "DailyIntRate should be positive")
+		assert.NotEmpty(t, lo.CreatedAt, "CreatedAt should not be empty")
 	}
 }
 

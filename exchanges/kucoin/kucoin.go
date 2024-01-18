@@ -62,7 +62,7 @@ const (
 	kucoinGetOrderbook         = "/v3/market/orderbook/level2"
 	kucoinGetMarginAccount     = "/v1/margin/account"
 	kucoinGetMarginRiskLimit   = "/v1/risk/limit/strategy"
-	kucoinBorrowOrder          = "/v1/margin/borrow"
+	kucoinBorrowOrder          = "/v3/margin/borrow"
 	kucoinGetOutstandingRecord = "/v1/margin/borrow/outstanding"
 	kucoinGetRepaidRecord      = "/v1/margin/borrow/repaid"
 	kucoinOneClickRepayment    = "/v1/margin/repay/all"
