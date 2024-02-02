@@ -1203,42 +1203,35 @@ func (ok *Okx) GenerateDefaultSubscriptions() ([]subscription.Subscription, erro
 	subscriptions := []subscription.Subscription{}
 	assets := ok.GetAssetTypes(true)
 	authed := ok.Websocket.CanUseAuthenticatedEndpoints()
-	for _, subs := range ok.Features.Subscriptions {
-		if !authed && subs.Authenticated {
+	for _, baseSub := range ok.Features.Subscriptions {
+		if !authed && baseSub.Authenticated {
 			continue
 		}
-		for _, baseSub := range ok.Features.Subscriptions {
-			s := *baseSub
-			s.Channel = channelName(s.Channel)
-			switch s.Channel {
-			case channelOrders:
-				for _, a := range assets {
-					subscriptions = append(subscriptions, subscription.Subscription{
-						Channel: s.Channel,
-						Asset:   a,
-					})
-				}
-			case channelCandle, channelTickers, channelFundingRate, channelPublicBlockTrades, channelBlockTickers, channelOpenInterest, channelPriceLimit, channelMarkPrice, channelMarkPriceCandle, channelTrades, channelTradesAll, opAmendOrder, opBatchAmendOrders, opBatchCancelOrders, opBatchOrders, opCancelOrder, opOrder, channelIndexCandle, channelIndexTickers, channelOrderBooks, channelOrderBooks5, channelOrderBooksTBT, channelOrderBooks50TBT:
-				for _, a := range assets {
-					pairs, err := ok.GetEnabledPairs(a)
-					if err != nil {
-						return nil, err
-					}
-					for _, p := range pairs {
-						subscriptions = append(subscriptions, subscription.Subscription{
-							Channel: s.Channel,
-							Asset:   a,
-							Pair:    p,
-						})
-					}
-				}
-			default:
-				subscriptions = append(subscriptions, subscription.Subscription{
-					Channel: s.Channel,
-				})
+		s := *baseSub
+		s.Channel = channelName(s.Channel)
+		switch s.Channel {
+		case channelOrders:
+			for _, a := range assets {
+				s.Asset = a
+				subscriptions = append(subscriptions, s)
 			}
+		case channelCandle, channelTickers, channelFundingRate, channelPublicBlockTrades, channelBlockTickers, channelOpenInterest, channelPriceLimit, channelMarkPrice, channelMarkPriceCandle, channelTrades, channelTradesAll, opAmendOrder, opBatchAmendOrders, opBatchCancelOrders, opBatchOrders, opCancelOrder, opOrder, channelIndexCandle, channelIndexTickers, channelOrderBooks, channelOrderBooks5, channelOrderBooksTBT, channelOrderBooks50TBT:
+			for _, a := range assets {
+				pairs, err := ok.GetEnabledPairs(a)
+				if err != nil {
+					return nil, err
+				}
+				s.Asset = a
+				for _, p := range pairs {
+					s.Pair = p
+					subscriptions = append(subscriptions, s)
+				}
+			}
+		default:
+			subscriptions = append(subscriptions, s)
 		}
 	}
+
 	return subscriptions, nil
 }
 

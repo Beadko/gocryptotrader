@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/common/key"
 	"github.com/thrasher-corp/gocryptotrader/config"
@@ -2925,37 +2926,35 @@ func TestGenerateDefaultSubscriptions(t *testing.T) {
 	assert.NoError(t, err, "GenerateDefaultSubscriptions should not error")
 	expected := []subscription.Subscription{}
 	assets := ok.GetAssetTypes(true)
-	//require.False(t, ok.Websocket.CanUseAuthenticatedEndpoints(), "Websocket must not be authenticated by default")
+	require.False(t, ok.Websocket.CanUseAuthenticatedEndpoints(), "Websocket must not be authenticated by default")
 	for _, exp := range ok.Features.Subscriptions {
+		if exp.Authenticated {
+			continue
+		}
 		s := *exp
 		s.Channel = channelName(s.Channel)
 		switch s.Channel {
 		case channelOrders:
 			for _, a := range assets {
-				expected = append(expected, subscription.Subscription{
-					Channel: s.Channel,
-					Asset:   a,
-				})
+				s.Asset = a
+				expected = append(expected, s)
 			}
 		case channelCandle, channelTickers, channelFundingRate, channelPublicBlockTrades, channelBlockTickers, channelOpenInterest, channelPriceLimit, channelMarkPrice, channelMarkPriceCandle, channelTrades, channelTradesAll, opAmendOrder, opBatchAmendOrders, opBatchCancelOrders, opBatchOrders, opCancelOrder, opOrder, channelIndexCandle, channelIndexTickers, channelOrderBooks, channelOrderBooks5, channelOrderBooksTBT, channelOrderBooks50TBT:
 			for _, a := range assets {
 				pairs, err := ok.GetEnabledPairs(a)
 				assert.NoError(t, err, "GetEnabledPairs should not error")
+				s.Asset = a
 				for _, p := range pairs {
-					expected = append(expected, subscription.Subscription{
-						Channel: s.Channel,
-						Asset:   a,
-						Pair:    p,
-					})
+					s.Pair = p
+					expected = append(expected, s)
 				}
 			}
 		default:
-			expected = append(expected, subscription.Subscription{
-				Channel: s.Channel,
-			})
+			expected = append(expected, s)
 		}
 	}
-	if assert.Len(t, subs, len(expected), "Should generate the correct number of subscriptions when not logged in") {
+
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when not logged in") {
 		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
 	}
 }
@@ -2967,43 +2966,36 @@ func TestGenerateDefaultAuthSubscriptions(t *testing.T) {
 
 	subs, err := ok.GenerateDefaultSubscriptions()
 	assert.NoError(t, err, "GenerateDefaultSubscriptions should not error")
+	ok.Websocket.SetCanUseAuthenticatedEndpoints(true)
 	expected := []subscription.Subscription{}
 	assets := ok.GetAssetTypes(true)
-	authed := ok.Websocket.CanUseAuthenticatedEndpoints()
-	for _, auth := range ok.Features.Subscriptions {
-		if !authed && auth.Authenticated {
-			for _, exp := range ok.Features.Subscriptions {
-				s := *exp
-				switch s.Channel {
-				case channelOrders:
-					for x := range assets {
-						expected = append(expected, subscription.Subscription{
-							Channel: s.Channel,
-							Asset:   assets[x],
-						})
-					}
-				case channelCandle, channelTickers, channelFundingRate, channelPublicBlockTrades, channelBlockTickers, channelOpenInterest, channelPriceLimit, channelMarkPrice, channelMarkPriceCandle, channelTrades, channelTradesAll, opAmendOrder, opBatchAmendOrders, opBatchCancelOrders, opBatchOrders, opCancelOrder, opOrder, channelIndexCandle, channelIndexTickers, channelOrderBooks, channelOrderBooks5, channelOrderBooksTBT, channelOrderBooks50TBT:
-					for x := range assets {
-						pairs, err := ok.GetEnabledPairs(assets[x])
-						assert.Error(t, err, "GetEnabledPairs should not error")
-						for p := range pairs {
-							expected = append(expected, subscription.Subscription{
-								Channel: s.Channel,
-								Asset:   assets[x],
-								Pair:    pairs[p],
-							})
-						}
-					}
-				default:
-					expected = append(expected, subscription.Subscription{
-						Channel: s.Channel,
-					})
+	for _, exp := range ok.Features.Subscriptions {
+
+		s := *exp
+		s.Channel = channelName(s.Channel)
+		switch s.Channel {
+		case channelOrders:
+			for _, a := range assets {
+				s.Asset = a
+				expected = append(expected, s)
+			}
+		case channelCandle, channelTickers, channelFundingRate, channelPublicBlockTrades, channelBlockTickers, channelOpenInterest, channelPriceLimit, channelMarkPrice, channelMarkPriceCandle, channelTrades, channelTradesAll, opAmendOrder, opBatchAmendOrders, opBatchCancelOrders, opBatchOrders, opCancelOrder, opOrder, channelIndexCandle, channelIndexTickers, channelOrderBooks, channelOrderBooks5, channelOrderBooksTBT, channelOrderBooks50TBT:
+			for _, a := range assets {
+				pairs, err := ok.GetEnabledPairs(a)
+				assert.NoError(t, err, "GetEnabledPairs should not error")
+				s.Asset = a
+				for _, p := range pairs {
+					s.Pair = p
+					expected = append(expected, s)
 				}
 			}
-			if assert.Len(t, subs, len(expected), "Should generate the correct number of subscriptions when not logged in") {
-				assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
-			}
+		default:
+			expected = append(expected, s)
 		}
+	}
+
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when logged in") {
+		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
 	}
 }
 
