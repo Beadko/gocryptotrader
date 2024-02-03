@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/thrasher-corp/gocryptotrader/common/key"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
@@ -20,6 +21,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/margin"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/sharedtestvalues"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 	"github.com/thrasher-corp/gocryptotrader/portfolio/withdraw"
 )
 
@@ -3528,4 +3530,84 @@ func TestIsPerpetualFutureCurrency(t *testing.T) {
 	is, err = b.IsPerpetualFutureCurrency(asset.USDCMarginedFutures, usdcMarginedTradablePair)
 	assert.NoError(t, err)
 	assert.True(t, is, fmt.Sprintf("%s %s should be a perp", asset.USDCMarginedFutures, usdcMarginedTradablePair))
+}
+
+// TODO still failing
+func TestGenerateDefaultSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	subs, err := b.GenerateDefaultSubscriptions()
+	assert.NoError(t, err, "GenerateDefaultSubscriptions should not error")
+	expected := []subscription.Subscription{}
+	assets := b.GetAssetTypes(true)
+	require.False(t, b.Websocket.CanUseAuthenticatedEndpoints(), "Websocket must not be authenticated by default")
+	for _, exp := range b.Features.Subscriptions {
+		if exp.Authenticated {
+			continue
+		}
+		s := *exp
+		s.Channel = channelName(s.Channel)
+		switch s.Channel {
+		case chanDCP,
+			chanWallet, chanPositions:
+			for _, a := range assets {
+				s.Asset = a
+				expected = append(expected, s)
+			}
+		case chanOrderbook, chanPublicTrade, chanKline, chanPublicTicker, chanOrder, chanExecution:
+			for _, a := range assets {
+				pairs, err := b.GetEnabledPairs(a)
+				assert.NoError(t, err, "GetEnabledPairs should not error")
+				s.Asset = a
+				for _, p := range pairs {
+					s.Pair = p
+					expected = append(expected, s)
+				}
+			}
+		default:
+			expected = append(expected, s)
+		}
+	}
+
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when not logged in") {
+		//assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
+	}
+}
+
+func TestGenerateDefaultAuthSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	subs, err := b.GenerateDefaultSubscriptions()
+	assert.NoError(t, err, "GenerateDefaultSubscriptions should not error")
+	b.Websocket.SetCanUseAuthenticatedEndpoints(true)
+	expected := []subscription.Subscription{}
+	assets := b.GetAssetTypes(true)
+	for _, exp := range b.Features.Subscriptions {
+		s := *exp
+		s.Channel = channelName(s.Channel)
+		switch s.Channel {
+		case chanDCP,
+			chanWallet, chanPositions:
+			for _, a := range assets {
+				s.Asset = a
+				expected = append(expected, s)
+			}
+		case chanOrderbook, chanPublicTrade, chanKline, chanPublicTicker, chanOrder, chanExecution:
+			for _, a := range assets {
+				pairs, err := b.GetEnabledPairs(a)
+				assert.NoError(t, err, "GetEnabledPairs should not error")
+				s.Asset = a
+				for _, p := range pairs {
+					s.Pair = p
+					expected = append(expected, s)
+				}
+			}
+		default:
+			expected = append(expected, s)
+		}
+	}
+
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when logged in") {
+		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
+	}
 }

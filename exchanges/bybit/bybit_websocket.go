@@ -54,6 +54,15 @@ const (
 	websocketPrivate = "wss://stream.bybit.com/v5/private"
 )
 
+var subscriptionNames = map[string]string{
+	subscription.TickerChannel:    chanPublicTicker,
+	subscription.OrderbookChannel: chanOrderbook,
+	subscription.CandlesChannel:   chanKline,
+	subscription.AllTradesChannel: chanPublicTrade,
+	subscription.MyOrdersChannel:  chanOrder,
+	subscription.MyTradesChannel:  chanExecution,
+}
+
 // WsConnect connects to a websocket feed
 func (by *Bybit) WsConnect() error {
 	if !by.Websocket.IsEnabled() || !by.IsEnabled() || !by.IsAssetWebsocketSupported(asset.Spot) {
@@ -238,47 +247,47 @@ func (by *Bybit) handleSpotSubscription(operation string, channelsToSubscribe []
 	return nil
 }
 
+// channelName converts global channel Names used in config of channel input into kucoin channel names
+// returns the name unchanged if no match is found
+func channelName(name string) string {
+	if s, ok := subscriptionNames[name]; ok {
+		return s
+	}
+	return name
+}
+
 // GenerateDefaultSubscriptions generates default subscription
 func (by *Bybit) GenerateDefaultSubscriptions() ([]subscription.Subscription, error) {
-	var subscriptions []subscription.Subscription
-	var channels = []string{
-		chanPublicTicker,
-		chanOrderbook,
-		chanPublicTrade,
-	}
-	if by.Websocket.CanUseAuthenticatedEndpoints() {
-		channels = append(channels, []string{
-			chanPositions,
-			chanExecution,
-			chanOrder,
-			chanWallet,
-		}...)
-	}
-	pairs, err := by.GetEnabledPairs(asset.Spot)
-	if err != nil {
-		return nil, err
-	}
-	for x := range channels {
-		switch channels[x] {
-		case chanPositions,
-			chanExecution,
-			chanOrder,
-			chanDCP,
-			chanWallet:
-			subscriptions = append(subscriptions,
-				subscription.Subscription{
-					Channel: channels[x],
-					Asset:   asset.Spot,
-				})
-		default:
-			for z := range pairs {
-				subscriptions = append(subscriptions,
-					subscription.Subscription{
-						Channel: channels[x],
-						Pair:    pairs[z],
-						Asset:   asset.Spot,
-					})
+	subscriptions := []subscription.Subscription{}
+	assets := by.GetAssetTypes(true)
+	authed := by.Websocket.CanUseAuthenticatedEndpoints()
+	for _, baseSub := range by.Features.Subscriptions {
+		if !authed && baseSub.Authenticated {
+			continue
+		}
+		s := *baseSub
+		s.Channel = channelName(s.Channel)
+		switch s.Channel {
+		case chanDCP,
+			chanWallet, chanPositions:
+			for _, a := range assets {
+				s.Asset = a
+				subscriptions = append(subscriptions, s)
 			}
+		case chanOrderbook, chanPublicTrade, chanKline, chanPublicTicker, chanOrder, chanExecution:
+			for _, a := range assets {
+				pairs, err := by.GetEnabledPairs(a)
+				if err != nil {
+					return nil, err
+				}
+				s.Asset = a
+				for _, p := range pairs {
+					s.Pair = p
+					subscriptions = append(subscriptions, s)
+				}
+			}
+		default:
+			subscriptions = append(subscriptions, s)
 		}
 	}
 	return subscriptions, nil
