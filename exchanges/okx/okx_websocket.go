@@ -260,13 +260,48 @@ func (ok *Okx) wsReadData(ws stream.Connection) {
 
 // Subscribe sends a websocket subscription request to several channels to receive data.
 func (ok *Okx) Subscribe(channelsToSubscribe []subscription.Subscription) error {
-	//return ok.ParallelChanOp(chans, ok.subscribeToChan, 1)
-	return ok.handleSubscription(operationSubscribe, channelsToSubscribe)
+	return ok.ParallelChanOp(channelsToSubscribe, ok.subscribeToChan, 1)
+	//return ok.handleSubscription(operationSubscribe, channelsToSubscribe)
+
 }
 
 // Unsubscribe sends a websocket unsubscription request to several channels to receive data.
 func (ok *Okx) Unsubscribe(channelsToUnsubscribe []subscription.Subscription) error {
 	return ok.handleSubscription(operationUnsubscribe, channelsToUnsubscribe)
+}
+
+func (ok *Okx) subscribeToChan(subs []subscription.Subscription) error {
+	for i := range subs {
+		s := &subs[i]
+		underlying, err := ok.GetUnderlying(s.Pair, s.Asset)
+		if err != nil {
+			return err
+		}
+		algoID, _ := s.Params["algoId"].(string)
+		if err != nil {
+			return err
+		} // If it's not a string, it'll be empty, which is okay?
+
+		oneSub := SubscriptionInfo{
+			Channel:        s.Channel,
+			InstrumentID:   s.Pair.String(),
+			InstrumentType: ok.GetInstrumentTypeFromAssetItem(s.Asset),
+			Underlying:     underlying,
+			AlgoID:         algoID,
+		}
+
+		req := WSSubscriptionInformationList{
+			Operation: operationSubscribe,
+			Arguments: []SubscriptionInfo{
+				oneSub,
+			},
+		}
+		err = ok.Websocket.Conn.SendJSONMessage(req)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // handleSubscription sends a subscription and unsubscription information thought the websocket endpoint.
