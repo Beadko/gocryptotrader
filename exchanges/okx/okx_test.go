@@ -30,6 +30,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/sharedtestvalues"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
 	"github.com/thrasher-corp/gocryptotrader/portfolio/withdraw"
 )
 
@@ -43,6 +44,8 @@ const (
 )
 
 var ok = &Okx{}
+
+var btcusdtPair = currency.NewPair(currency.BTC, currency.USDT)
 
 func TestMain(m *testing.M) {
 	cfg := config.GetConfig()
@@ -2738,6 +2741,43 @@ func setupWS() {
 }
 
 // ************************** Public Channel Subscriptions *****************************
+
+// TestSubscribe check subscribe logic
+func TestSubscribe(t *testing.T) {
+	t.Parallel()
+	t.Error("must accept subscription.* as channel names")
+	err := ok.Subscribe([]subscription.Subscription{
+		{
+			Channel:  channelTickers,
+			Pair:     btcusdtPair,
+			Asset:    asset.Spot,
+			Interval: kline.FifteenMin,
+		},
+	})
+	assert.Error(t, err, "Subscribe with bad pair delimiter should error")
+	btcusdtPair.Delimiter = "-"
+	err = ok.Subscribe([]subscription.Subscription{
+		{
+			Channel:  channelTickers,
+			Pair:     btcusdtPair,
+			Asset:    asset.Spot,
+			Interval: kline.FifteenMin,
+		},
+	})
+	require.NoError(t, err, "Subscribe must not error")
+	assert.Eventually(t, func() bool {
+		select {
+		case v := <-ok.Websocket.DataHandler:
+			switch v.(type) {
+			case *ticker.Price:
+				return true
+			}
+		default:
+		}
+		return false
+
+	}, time.Second, time.Millisecond*10, "Should receive ticker data from subscription")
+}
 
 func TestInstrumentsSubscription(t *testing.T) {
 	t.Parallel()
