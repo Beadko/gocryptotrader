@@ -28,6 +28,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream/buffer"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/trade"
 	"github.com/thrasher-corp/gocryptotrader/log"
@@ -191,6 +192,14 @@ func (k *Kraken) SetDefaults() {
 				GlobalResultLimit: 720,
 			},
 		},
+		Subscriptions: []*subscription.Subscription{
+			{Enabled: true, Channel: subscription.TickerChannel},
+			{Enabled: true, Channel: subscription.AllTradesChannel},
+			{Enabled: true, Channel: subscription.CandlesChannel, Interval: kline.OneMin},
+			{Enabled: true, Channel: subscription.OrderbookChannel, Interval: kline.HundredMilliseconds},
+			{Enabled: true, Channel: subscription.MyOrdersChannel, Authenticated: true},
+			{Enabled: true, Channel: subscription.MyTradesChannel, Authenticated: true},
+		},
 	}
 
 	k.Requester, err = request.New(k.Name,
@@ -203,7 +212,7 @@ func (k *Kraken) SetDefaults() {
 	err = k.API.Endpoints.SetDefaultEndpoints(map[exchange.URL]string{
 		exchange.RestSpot:                 krakenAPIURL,
 		exchange.RestFutures:              krakenFuturesURL,
-		exchange.WebsocketSpot:            krakenWSURL,
+		exchange.WebsocketSpot:            wsURL,
 		exchange.RestFuturesSupplementary: krakenFuturesSupplementaryURL,
 	})
 	if err != nil {
@@ -241,7 +250,7 @@ func (k *Kraken) Setup(exch *config.Exchange) error {
 	}
 	err = k.Websocket.Setup(&stream.WebsocketSetup{
 		ExchangeConfig:        exch,
-		DefaultURL:            krakenWSURL,
+		DefaultURL:            wsURL,
 		RunningURL:            wsRunningURL,
 		Connector:             k.WsConnect,
 		Subscriber:            k.Subscribe,
@@ -255,20 +264,20 @@ func (k *Kraken) Setup(exch *config.Exchange) error {
 	}
 
 	err = k.Websocket.SetupNewConnection(stream.ConnectionSetup{
-		RateLimit:            krakenWsRateLimit,
+		RateLimit:            wsRateLimit,
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
-		URL:                  krakenWSURL,
+		URL:                  wsURL,
 	})
 	if err != nil {
 		return err
 	}
 
 	return k.Websocket.SetupNewConnection(stream.ConnectionSetup{
-		RateLimit:            krakenWsRateLimit,
+		RateLimit:            wsRateLimit,
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
-		URL:                  krakenAuthWSURL,
+		URL:                  authWSURL,
 		Authenticated:        true,
 	})
 }
@@ -753,7 +762,7 @@ func (k *Kraken) SubmitOrder(ctx context.Context, s *order.Submit) (*order.Submi
 			timeInForce = RequestParamsTimeIOC
 		}
 		if k.Websocket.CanUseAuthenticatedWebsocketForWrapper() {
-			orderID, err = k.wsAddOrder(&WsAddOrderRequest{
+			orderID, err = k.wsAddOrder(&WebsocketAddOrderRequest{
 				OrderType:   s.Type.Lower(),
 				OrderSide:   s.Side.Lower(),
 				Pair:        s.Pair.Format(currency.PairFormat{Uppercase: true, Delimiter: "/"}).String(), // required pair format: ISO 4217-A3

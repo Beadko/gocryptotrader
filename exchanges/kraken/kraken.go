@@ -1200,7 +1200,7 @@ func (k *Kraken) WithdrawCancel(ctx context.Context, c currency.Code, refID stri
 
 // GetWebsocketToken returns a websocket token
 func (k *Kraken) GetWebsocketToken(ctx context.Context) (string, error) {
-	var response WsTokenResponse
+	var response WebsocketTokenResponse
 	if err := k.SendAuthenticatedHTTPRequest(ctx, exchange.RestSpot, krakenWebsocketToken, url.Values{}, &response); err != nil {
 		return "", err
 	}

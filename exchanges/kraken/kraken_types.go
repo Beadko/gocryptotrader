@@ -568,8 +568,8 @@ type WebsocketChannelData struct {
 	MaxDepth     int
 }
 
-// WsTokenResponse holds the WS auth token
-type WsTokenResponse struct {
+// WebsocketTokenResponse holds the WS auth token
+type WebsocketTokenResponse struct {
 	Error  []string `json:"error"`
 	Result struct {
 		Expires int64  `json:"expires"`
@@ -577,14 +577,14 @@ type WsTokenResponse struct {
 	} `json:"result"`
 }
 
-type wsSystemStatus struct {
+type WebsocketSystemStatus struct {
 	ConnectionID float64 `json:"connectionID"`
 	Event        string  `json:"event"`
 	Status       string  `json:"status"`
 	Version      string  `json:"version"`
 }
 
-type wsSubscription struct {
+type WebsocketSubscription struct {
 	ChannelID    *int64 `json:"channelID"`
 	ChannelName  string `json:"channelName"`
 	ErrorMessage string `json:"errorMessage"`
@@ -599,8 +599,8 @@ type wsSubscription struct {
 	} `json:"subscription"`
 }
 
-// WsOpenOrder contains all open order data from ws feed
-type WsOpenOrder struct {
+// WebsocketOpenOrder contains all open order data from ws feed
+type WebsocketOpenOrder struct {
 	UserReferenceID int64   `json:"userref"`
 	ExpireTime      float64 `json:"expiretm,string"`
 	LastUpdated     float64 `json:"lastupdated,string"`
@@ -629,8 +629,8 @@ type WsOpenOrder struct {
 	} `json:"descr"`
 }
 
-// WsOwnTrade ws auth owntrade data
-type WsOwnTrade struct {
+// WebsocketOwnTrade ws auth owntrade data
+type WebsocketOwnTrade struct {
 	Cost               float64 `json:"cost,string"`
 	Fee                float64 `json:"fee,string"`
 	Margin             float64 `json:"margin,string"`
@@ -644,28 +644,28 @@ type WsOwnTrade struct {
 	Vol                float64 `json:"vol,string"`
 }
 
-// WsOpenOrders ws auth open order data
-type WsOpenOrders struct {
-	Cost           float64                `json:"cost,string"`
-	Description    WsOpenOrderDescription `json:"descr"`
-	ExpireTime     time.Time              `json:"expiretm"`
-	Fee            float64                `json:"fee,string"`
-	LimitPrice     float64                `json:"limitprice,string"`
-	Misc           string                 `json:"misc"`
-	OFlags         string                 `json:"oflags"`
-	OpenTime       time.Time              `json:"opentm"`
-	Price          float64                `json:"price,string"`
-	RefID          string                 `json:"refid"`
-	StartTime      time.Time              `json:"starttm"`
-	Status         string                 `json:"status"`
-	StopPrice      float64                `json:"stopprice,string"`
-	UserReference  float64                `json:"userref"`
-	Volume         float64                `json:"vol,string"`
-	ExecutedVolume float64                `json:"vol_exec,string"`
+// WebsocketOpenOrders ws auth open order data
+type WebsocketOpenOrders struct {
+	Cost           float64                       `json:"cost,string"`
+	Description    WebsocketOpenOrderDescription `json:"descr"`
+	ExpireTime     time.Time                     `json:"expiretm"`
+	Fee            float64                       `json:"fee,string"`
+	LimitPrice     float64                       `json:"limitprice,string"`
+	Misc           string                        `json:"misc"`
+	OFlags         string                        `json:"oflags"`
+	OpenTime       time.Time                     `json:"opentm"`
+	Price          float64                       `json:"price,string"`
+	RefID          string                        `json:"refid"`
+	StartTime      time.Time                     `json:"starttm"`
+	Status         string                        `json:"status"`
+	StopPrice      float64                       `json:"stopprice,string"`
+	UserReference  float64                       `json:"userref"`
+	Volume         float64                       `json:"vol,string"`
+	ExecutedVolume float64                       `json:"vol_exec,string"`
 }
 
-// WsOpenOrderDescription additional data for WsOpenOrders
-type WsOpenOrderDescription struct {
+// WebsocketOpenOrderDescription additional data for WsOpenOrders
+type WebsocketOpenOrderDescription struct {
 	Close     string  `json:"close"`
 	Leverage  string  `json:"leverage"`
 	Order     string  `json:"order"`
@@ -676,8 +676,8 @@ type WsOpenOrderDescription struct {
 	Type      string  `json:"type"`
 }
 
-// WsAddOrderRequest request type for ws adding order
-type WsAddOrderRequest struct {
+// WebsocketAddOrderRequest request type for ws adding order
+type WebsocketAddOrderRequest struct {
 	Event           string                     `json:"event"`
 	Token           string                     `json:"token"`
 	RequestID       int64                      `json:"reqid,omitempty"` // Optional, client originated ID reflected in response message.
@@ -699,8 +699,8 @@ type WsAddOrderRequest struct {
 	TimeInForce     RequestParamsTimeForceType `json:"timeinforce,omitempty"`      // optional
 }
 
-// WsAddOrderResponse response data for ws order
-type WsAddOrderResponse struct {
+// WebsocketAddOrderResponse response data for ws order
+type WebsocketAddOrderResponse struct {
 	Event         string `json:"event"`
 	RequestID     int64  `json:"reqid"`
 	Status        string `json:"status"`
@@ -709,16 +709,16 @@ type WsAddOrderResponse struct {
 	ErrorMessage  string `json:"errorMessage"`
 }
 
-// WsCancelOrderRequest request for ws cancel order
-type WsCancelOrderRequest struct {
+// WebsocketCancelOrderRequest request for ws cancel order
+type WebsocketCancelOrderRequest struct {
 	Event          string   `json:"event"`
 	Token          string   `json:"token"`
 	TransactionIDs []string `json:"txid,omitempty"`
 	RequestID      int64    `json:"reqid,omitempty"` // Optional, client originated ID reflected in response message.
 }
 
-// WsCancelOrderResponse response data for ws cancel order and ws cancel all orders
-type WsCancelOrderResponse struct {
+// WebsocketCancelOrderResponse response data for ws cancel order and ws cancel all orders
+type WebsocketCancelOrderResponse struct {
 	Event        string `json:"event"`
 	Status       string `json:"status"`
 	ErrorMessage string `json:"errorMessage"`

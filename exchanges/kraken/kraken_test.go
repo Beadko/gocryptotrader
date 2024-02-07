@@ -36,6 +36,7 @@ import (
 
 var k = &Kraken{}
 var wsSetupRan bool
+var btcusdtPair = currency.NewPair(currency.BTC, currency.USDT)
 
 // Please add your own APIkeys to do correct due diligence testing.
 const (
@@ -1245,6 +1246,48 @@ func setupWsTests(t *testing.T) {
 	wsSetupRan = true
 }
 
+// TestGenerateDefaultSubscriptions tests the subscription to the default channels without the authentication
+func TestGenerateDefaultSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	subs, err := k.GenerateDefaultSubscriptions()
+	assert.NoError(t, err, "GenerateDefaultSubscriptions should not error")
+	expected := []subscription.Subscription{}
+	assets := k.GetAssetTypes(true)
+	require.False(t, k.Websocket.CanUseAuthenticatedEndpoints(), "Websocket must not be authenticated by default")
+	for _, exp := range k.Features.Subscriptions {
+		if exp.Authenticated {
+			continue
+		}
+		s := *exp
+		s.Channel = channelName(s.Channel)
+		for _, a := range assets {
+			pairs, err := k.GetEnabledPairs(a)
+			assert.NoError(t, err, "GetEnabledPairs should not error")
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				expected = append(expected, s)
+			}
+		}
+	}
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when not logged in") {
+		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
+	}
+}
+
+func TestSubscribe(t *testing.T) {
+	err := k.Subscribe([]subscription.Subscription{
+		{
+			Channel:  wsOHLC,
+			Pair:     btcusdtPair,
+			Asset:    asset.Spot,
+			Interval: kline.FifteenMin,
+		},
+	})
+	require.NoError(t, err, "Subscribe must not error")
+}
+
 // TestWebsocketSubscribe tests returning a message with an id
 func TestWebsocketSubscribe(t *testing.T) {
 	setupWsTests(t)
@@ -1275,7 +1318,7 @@ func TestGetWSToken(t *testing.T) {
 
 func TestWsAddOrder(t *testing.T) {
 	setupWsTests(t)
-	_, err := k.wsAddOrder(&WsAddOrderRequest{
+	_, err := k.wsAddOrder(&WebsocketAddOrderRequest{
 		OrderType: order.Limit.Lower(),
 		OrderSide: order.Buy.Lower(),
 		Pair:      "XBT/USD",
