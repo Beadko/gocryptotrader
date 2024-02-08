@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/buger/jsonparser"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/thrasher-corp/gocryptotrader/common"
@@ -1152,6 +1153,66 @@ func TestWsAuth(t *testing.T) {
 		assert.Equal(t, "OK", resp["status"], "status should be correct")
 		assert.NotEmpty(t, resp["auth_id"], "status should be correct")
 	}
+}
+
+func TestGenerateDefaultSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	subs, err := b.GenerateDefaultSubscriptions()
+	assert.NoError(t, err, "GenerateDefaultSubscriptions should not error")
+	expected := []subscription.Subscription{}
+	assets := b.GetAssetTypes(true)
+	require.False(t, b.Websocket.CanUseAuthenticatedEndpoints(), "Websocket must not be authenticated by default")
+	for _, exp := range b.Features.Subscriptions {
+		if exp.Authenticated {
+			continue
+		}
+		s := *exp
+		s.Channel = channelName(s.Channel)
+		for _, a := range assets {
+			pairs, err := b.GetEnabledPairs(a)
+			assert.NoError(t, err, "GetEnabledPairs should not error")
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				expected = append(expected, s)
+			}
+		}
+	}
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when not logged in") {
+		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
+	}
+}
+
+// TODO authenticated channels are not loading
+func TestGenerateDefaultAuthSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	subs, err := b.GenerateDefaultSubscriptions()
+	assert.NoError(t, err, "GenerateDefaultSubscriptions should not error")
+	expected := []subscription.Subscription{}
+	assets := b.GetAssetTypes(true)
+	b.Websocket.SetCanUseAuthenticatedEndpoints(true)
+	for _, exp := range b.Features.Subscriptions {
+		if exp.Authenticated {
+			continue
+		}
+		s := *exp
+		s.Channel = channelName(s.Channel)
+		for _, a := range assets {
+			pairs, err := b.GetEnabledPairs(a)
+			assert.NoError(t, err, "GetEnabledPairs should not error")
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				expected = append(expected, s)
+			}
+		}
+	}
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when not logged in") {
+		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
+	}
+	spew.Dump(subs)
 }
 
 // TestWsSubscribe tests Subscribe and Unsubscribe functionality

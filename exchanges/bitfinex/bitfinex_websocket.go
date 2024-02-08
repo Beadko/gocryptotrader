@@ -1616,8 +1616,43 @@ func (b *Bitfinex) resubOrderbook(c *subscription.Subscription) {
 	}()
 }
 
+// channelName converts global channel Names used in config of channel input into kucoin channel names
+// returns the name unchanged if no match is found
+func channelName(name string) string {
+	if s, ok := subscriptionNames[name]; ok {
+		return s
+	}
+	return name
+}
+
 // GenerateDefaultSubscriptions Adds default subscriptions to websocket to be handled by ManageSubscriptions()
 func (b *Bitfinex) GenerateDefaultSubscriptions() ([]subscription.Subscription, error) {
+	subscriptions := []subscription.Subscription{}
+	assets := b.GetAssetTypes(true)
+	authed := b.Websocket.CanUseAuthenticatedEndpoints()
+	for _, baseSub := range b.Features.Subscriptions {
+		if !authed && baseSub.Authenticated {
+			continue
+		}
+		s := *baseSub
+		s.Channel = channelName(s.Channel)
+		for _, a := range assets {
+			pairs, err := b.GetEnabledPairs(a)
+			if err != nil {
+				return nil, err
+			}
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				subscriptions = append(subscriptions, s)
+			}
+		}
+	}
+	return subscriptions, nil
+}
+
+// GenerateDefaultSubscriptions Adds default subscriptions to websocket to be handled by ManageSubscriptions()
+func (b *Bitfinex) GenerateDefaultSubscriptions2() ([]subscription.Subscription, error) {
 	var channels = []string{wsBook, wsTrades, wsTicker, wsCandles}
 
 	var subscriptions []subscription.Subscription
