@@ -42,6 +42,15 @@ var (
 	}
 )
 
+var subscriptionNames = map[string]string{
+	subscription.OrderbookChannel: bitstampAPIWSOrderbook,
+	subscription.AllTradesChannel: bitstampAPIWSTrades,
+	subscription.AllOrdersChannel: bitstampAPIWSOrders,
+	subscription.MyTradesChannel:  bitstampAPIWSMyTrades,
+	subscription.MyOrdersChannel:  bitstampAPIWSMyOrders,
+	// No equivalents for: TickerChannel, CandlesChannel
+}
+
 // WsConnect connects to a websocket feed
 func (b *Bitstamp) WsConnect() error {
 	if !b.Websocket.IsEnabled() || !b.IsEnabled() {
@@ -231,43 +240,98 @@ func (b *Bitstamp) handleWSOrder(wsResp *websocketResponse, msg []byte) error {
 	return nil
 }
 
-func (b *Bitstamp) generateDefaultSubscriptions() ([]subscription.Subscription, error) {
-	enabledCurrencies, err := b.GetEnabledPairs(asset.Spot)
-	if err != nil {
-		return nil, err
-	}
-	var subscriptions []subscription.Subscription
-	for i := range enabledCurrencies {
-		p, err := b.FormatExchangeCurrency(enabledCurrencies[i], asset.Spot)
-		if err != nil {
-			return nil, err
+func (b *Bitstamp) GenerateSubscriptions() ([]subscription.Subscription, error) {
+	subscriptions := []subscription.Subscription{}
+	assets := b.GetAssetTypes(true)
+	authed := b.Websocket.CanUseAuthenticatedEndpoints()
+	for _, baseSub := range b.Features.Subscriptions {
+		if !authed && baseSub.Authenticated {
+			continue
 		}
-		for j := range defaultSubChannels {
-			subscriptions = append(subscriptions, subscription.Subscription{
-				Channel: defaultSubChannels[j] + "_" + p.String(),
-				Asset:   asset.Spot,
-				Pair:    p,
-			})
-		}
-		if b.Websocket.CanUseAuthenticatedEndpoints() {
-			for j := range defaultAuthSubChannels {
-				subscriptions = append(subscriptions, subscription.Subscription{
-					Channel: defaultAuthSubChannels[j] + "_" + p.String(),
-					Asset:   asset.Spot,
-					Pair:    p,
-					Params: map[string]interface{}{
-						"auth": struct{}{},
-					},
-				})
+		s := *baseSub
+		for _, a := range assets {
+			pairs, err := b.GetEnabledPairs(a)
+			if err != nil {
+				return nil, err
+			}
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				subscriptions = append(subscriptions, s)
 			}
 		}
 	}
 	return subscriptions, nil
 }
 
+// channelName converts global channel Names used in config of channel input into kucoin channel names
+// returns the name unchanged if no match is found
+func channelName(s *subscription.Subscription) (string, error) {
+
+	name, ok := subscriptionNames[s.Channel]
+	if !ok {
+		return name, fmt.Errorf("%w: %s", stream.ErrSubscriptionNotSupported, s.Channel)
+	}
+	if s.Pair != currency.EMPTYPAIR {
+		lp := s.Pair.Lower()
+		lp.Delimiter = ""
+		name = name + "_" + lp.String()
+	}
+	switch s.Channel {
+	case subscription.MyOrdersChannel, subscription.MyTradesChannel:
+		name = "private-" + name
+	}
+	return name, nil
+}
+
 // Subscribe sends a websocket message to receive data from the channel
 func (b *Bitstamp) Subscribe(channelsToSubscribe []subscription.Subscription) error {
-	var errs error
+	return b.ParallelChanOp(channelsToSubscribe, b.subscribeToChan, 1)
+}
+
+func (b *Bitstamp) subscribeToChan(subs []subscription.Subscription) error {
+	var auth *WebsocketAuthResponse
+	cNames := make([]string, len(subs))
+
+	for i := range subs {
+		if _, ok := subs[i].Params["auth"]; ok {
+			var err error
+			auth, err = b.FetchWSAuth(context.TODO())
+			if err != nil {
+				return err
+			}
+			break
+		}
+	}
+	for i := range subs {
+		c := subs[i]
+		cNames[i] = c.Channel
+		name, err := channelName(&c)
+		if err != nil {
+			return err
+		}
+		cNames[i] = name
+		c.State = subscription.SubscribingState
+		if err := b.Websocket.AddSubscription(&c); err != nil {
+			return fmt.Errorf("%w Channel: %s Pair: %s Error: %w", stream.ErrSubscriptionFailure, c.Channel, c.Pair, err)
+		}
+		req := websocketEventRequest{
+			Event: "bts:subscribe",
+			Data: websocketData{
+				Channel: cNames[i],
+			},
+		}
+		if _, ok := subs[i].Params["auth"]; ok && auth != nil {
+			req.Data.Channel += "-" + strconv.Itoa(int(auth.UserID))
+			req.Data.Auth = auth.Token
+		}
+		err = b.Websocket.Conn.SendJSONMessage(req)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+	/*var errs error
 	var auth *WebsocketAuthResponse
 
 	for i := range channelsToSubscribe {
@@ -300,7 +364,7 @@ func (b *Bitstamp) Subscribe(channelsToSubscribe []subscription.Subscription) er
 		b.Websocket.AddSuccessfulSubscriptions(channelsToSubscribe[i])
 	}
 
-	return errs
+	return errs*/
 }
 
 // Unsubscribe sends a websocket message to stop receiving data from the channel

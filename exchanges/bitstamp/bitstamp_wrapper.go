@@ -24,6 +24,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/protocol"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/trade"
 	"github.com/thrasher-corp/gocryptotrader/log"
@@ -130,6 +131,13 @@ func (b *Bitstamp) SetDefaults() {
 				GlobalResultLimit: 1000,
 			},
 		},
+		Subscriptions: []*subscription.Subscription{
+			{Enabled: true, Channel: subscription.AllTradesChannel},
+			{Enabled: true, Channel: subscription.AllOrdersChannel},
+			{Enabled: true, Channel: subscription.OrderbookChannel, Interval: kline.HundredMilliseconds, Levels: 2},
+			{Enabled: true, Channel: subscription.MyOrdersChannel, Authenticated: true},
+			{Enabled: true, Channel: subscription.MyTradesChannel, Authenticated: true},
+		},
 	}
 
 	b.Requester, err = request.New(b.Name,
@@ -179,7 +187,7 @@ func (b *Bitstamp) Setup(exch *config.Exchange) error {
 		Connector:             b.WsConnect,
 		Subscriber:            b.Subscribe,
 		Unsubscriber:          b.Unsubscribe,
-		GenerateSubscriptions: b.generateDefaultSubscriptions,
+		GenerateSubscriptions: b.GenerateSubscriptions,
 		Features:              &b.Features.Supports.WebsocketCapabilities,
 	})
 	if err != nil {

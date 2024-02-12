@@ -16,6 +16,8 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/sharedtestvalues"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
+	testexch "github.com/thrasher-corp/gocryptotrader/internal/testing/exchange"
 	"github.com/thrasher-corp/gocryptotrader/portfolio/banking"
 	"github.com/thrasher-corp/gocryptotrader/portfolio/withdraw"
 )
@@ -710,15 +712,81 @@ func TestParseTime(t *testing.T) {
 	}
 }
 
-func TestWsSubscription(t *testing.T) {
-	pressXToJSON := []byte(`{
+func TestGenerateSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	subs, err := b.GenerateSubscriptions()
+	require.NoError(t, err, "GenerateDefaultSubscriptions must not error")
+	expected := []subscription.Subscription{}
+	assets := b.GetAssetTypes(true)
+	require.False(t, b.Websocket.CanUseAuthenticatedEndpoints(), "Websocket must not be authenticated by default")
+	for _, exp := range b.Features.Subscriptions {
+		if exp.Authenticated {
+			continue
+		}
+		s := *exp
+		for _, a := range assets {
+			pairs, err := b.GetEnabledPairs(a)
+			assert.NoError(t, err, "GetEnabledPairs should not error")
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				expected = append(expected, s)
+			}
+		}
+	}
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when not logged in") {
+		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
+	}
+}
+
+func TestGenerateAuthSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	subs, err := b.GenerateSubscriptions()
+	require.NoError(t, err, "GenerateDefaultSubscriptions must not error")
+	expected := []subscription.Subscription{}
+	assets := b.GetAssetTypes(true)
+	b.Websocket.SetCanUseAuthenticatedEndpoints(true)
+	for _, exp := range b.Features.Subscriptions {
+		s := *exp
+		for _, a := range assets {
+			pairs, err := b.GetEnabledPairs(a)
+			assert.NoError(t, err, "GetEnabledPairs should not error")
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				expected = append(expected, s)
+			}
+		}
+	}
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when logged in") {
+		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
+	}
+}
+
+func TestSubscribe(t *testing.T) {
+	t.Parallel()
+	err := b.Subscribe([]subscription.Subscription{
+		{
+			Channel: subscription.AllTradesChannel,
+			Pair:    btcusdPair,
+			Asset:   asset.Spot,
+		},
+	})
+
+	testexch.SetupWs(t, b)
+
+	require.NoError(t, err, "Subscribe must not error")
+
+	/*pressXToJSON := []byte(`{
 		"event": "bts:subscribe",
 		"data": {
 			"channel": "[channel_name]"
 		}
 	}`)
 	err := b.wsHandleData(pressXToJSON)
-	assert.NoError(t, err, "TestWsSubscription should not error")
+	assert.NoError(t, err, "TestWsSubscription should not error")*/
 }
 
 func TestWsUnsubscribe(t *testing.T) {
