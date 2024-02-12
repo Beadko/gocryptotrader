@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
@@ -17,6 +20,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/orderbook"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/sharedtestvalues"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 )
 
 var b = &BTCMarkets{}
@@ -59,6 +63,68 @@ func TestMain(m *testing.M) {
 		b.API.AuthenticatedWebsocketSupport = false
 	}
 	os.Exit(m.Run())
+}
+
+func TestGenerateSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	subs, err := b.GenerateSubscriptions()
+	require.NoError(t, err, "GenerateSubscriptions must not error")
+	expected := []subscription.Subscription{}
+	assets := b.GetAssetTypes(true)
+	require.False(t, b.Websocket.CanUseAuthenticatedEndpoints(), "Websocket must not be authenticated by default")
+	for _, exp := range b.Features.Subscriptions {
+		if exp.Authenticated {
+			continue
+		}
+		s := *exp
+		s.Channel = channelName(s.Channel)
+		for _, a := range assets {
+			pairs, err := b.GetEnabledPairs(a)
+			assert.NoError(t, err, "GetEnabledPairs should not error")
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				expected = append(expected, s)
+			}
+		}
+	}
+	spew.Dump(expected)
+	spew.Dump(subs)
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when not logged in") {
+		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
+	}
+}
+
+func TestGenerateAuthSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	subs, err := b.GenerateSubscriptions()
+	require.NoError(t, err, "GenerateSubscriptions must not error")
+	expected := []subscription.Subscription{}
+	assets := b.GetAssetTypes(true)
+	b.Websocket.SetCanUseAuthenticatedEndpoints(true)
+	for _, exp := range b.Features.Subscriptions {
+		if exp.Authenticated {
+			continue
+		}
+		s := *exp
+		s.Channel = channelName(s.Channel)
+		for _, a := range assets {
+			pairs, err := b.GetEnabledPairs(a)
+			assert.NoError(t, err, "GetEnabledPairs should not error")
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				expected = append(expected, s)
+			}
+		}
+	}
+	spew.Dump(expected)
+	spew.Dump(subs)
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when not logged in") {
+		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
+	}
 }
 
 func TestGetMarkets(t *testing.T) {

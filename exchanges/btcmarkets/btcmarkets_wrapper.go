@@ -26,6 +26,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream/buffer"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/trade"
 	"github.com/thrasher-corp/gocryptotrader/log"
@@ -134,6 +135,12 @@ func (b *BTCMarkets) SetDefaults() {
 				GlobalResultLimit: 1000,
 			},
 		},
+		Subscriptions: []*subscription.Subscription{
+			{Enabled: true, Channel: subscription.TickerChannel},
+			{Enabled: true, Channel: subscription.AllTradesChannel},                                      // marketMatchChannel
+			{Enabled: true, Channel: subscription.OrderbookChannel, Interval: kline.HundredMilliseconds}, // marketOrderbookLevel2Channels
+			{Enabled: true, Channel: subscription.MyOrdersChannel, Authenticated: true},
+		},
 	}
 
 	b.Requester, err = request.New(b.Name,
@@ -183,7 +190,7 @@ func (b *BTCMarkets) Setup(exch *config.Exchange) error {
 		Connector:             b.WsConnect,
 		Subscriber:            b.Subscribe,
 		Unsubscriber:          b.Unsubscribe,
-		GenerateSubscriptions: b.generateDefaultSubscriptions,
+		GenerateSubscriptions: b.GenerateSubscriptions,
 		Features:              &b.Features.Supports.WebsocketCapabilities,
 		OrderbookBufferConfig: buffer.Config{
 			SortBuffer:          true,

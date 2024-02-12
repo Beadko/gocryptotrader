@@ -35,6 +35,14 @@ var (
 
 	authChannels = []string{fundChange, heartbeat, orderChange}
 )
+var subscriptionNames = map[string]string{
+	subscription.TickerChannel:    tick,
+	subscription.OrderbookChannel: wsOB,
+	subscription.AllTradesChannel: tradeEndPoint,
+	subscription.MyOrdersChannel:  orderChange,
+
+	// No equivalents for: CandlesChannel, AllOrders, MyTrades
+}
 
 // WsConnect connects to a websocket feed
 func (b *BTCMarkets) WsConnect() error {
@@ -325,31 +333,38 @@ func (b *BTCMarkets) wsHandleData(respRaw []byte) error {
 	return nil
 }
 
-func (b *BTCMarkets) generateDefaultSubscriptions() ([]subscription.Subscription, error) {
-	var channels = []string{wsOB, tick, tradeEndPoint}
-	enabledCurrencies, err := b.GetEnabledPairs(asset.Spot)
-	if err != nil {
-		return nil, err
-	}
-	var subscriptions []subscription.Subscription
-	for i := range channels {
-		for j := range enabledCurrencies {
-			subscriptions = append(subscriptions, subscription.Subscription{
-				Channel: channels[i],
-				Pair:    enabledCurrencies[j],
-				Asset:   asset.Spot,
-			})
+func (b *BTCMarkets) GenerateSubscriptions() ([]subscription.Subscription, error) {
+	subscriptions := []subscription.Subscription{}
+	assets := b.GetAssetTypes(true)
+	authed := b.Websocket.CanUseAuthenticatedEndpoints()
+	for _, baseSub := range b.Features.Subscriptions {
+		if !authed && baseSub.Authenticated {
+			continue
 		}
-	}
-
-	if b.Websocket.CanUseAuthenticatedEndpoints() {
-		for i := range authChannels {
-			subscriptions = append(subscriptions, subscription.Subscription{
-				Channel: authChannels[i],
-			})
+		s := *baseSub
+		s.Channel = channelName(s.Channel)
+		for _, a := range assets {
+			s.Asset = a
+			pairs, err := b.GetEnabledPairs(a)
+			if err != nil {
+				return nil, err
+			}
+			for _, p := range pairs {
+				s.Pair = p
+				subscriptions = append(subscriptions, s)
+			}
 		}
 	}
 	return subscriptions, nil
+}
+
+// channelName converts global channel Names used in config of channel input into kucoin channel names
+// returns the name unchanged if no match is found
+func channelName(name string) string {
+	if s, ok := subscriptionNames[name]; ok {
+		return s
+	}
+	return name
 }
 
 // Subscribe sends a websocket message to receive data from the channel
