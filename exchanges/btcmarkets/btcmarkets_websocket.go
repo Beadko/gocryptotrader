@@ -342,7 +342,6 @@ func (b *BTCMarkets) GenerateSubscriptions() ([]subscription.Subscription, error
 			continue
 		}
 		s := *baseSub
-		s.Channel = channelName(s.Channel)
 		for _, a := range assets {
 			s.Asset = a
 			pairs, err := b.GetEnabledPairs(a)
@@ -369,32 +368,31 @@ func channelName(name string) string {
 
 // Subscribe sends a websocket message to receive data from the channel
 func (b *BTCMarkets) Subscribe(subs []subscription.Subscription) error {
-	var payload WsSubscribe
-	if len(subs) > 1 {
-		// TODO: Expand this to stream package as this assumes that we are doing
-		// an initial sync.
-		payload.MessageType = subscribe
-	} else {
-		payload.MessageType = addSubscription
-		payload.ClientType = clientType
-	}
+	return b.ParallelChanOp(subs, b.subscribeToChan, 1)
+}
 
+func (b *BTCMarkets) subscribeToChan(chans []subscription.Subscription) error {
+	id := b.Websocket.Conn.GenerateMessageID(false)
+	cNames := make([]string, len(chans))
+	cPairs := make([]string, len(chans))
 	var authenticate bool
-	for i := range subs {
-		if !authenticate && common.StringDataContains(authChannels, subs[i].Channel) {
+	for i := range chans {
+		if !authenticate && common.StringDataContains(authChannels, chans[i].Channel) {
 			authenticate = true
 		}
-		payload.Channels = append(payload.Channels, subs[i].Channel)
-		if subs[i].Pair.IsEmpty() {
-			continue
+		c := chans[i]
+		cNames[i] = channelName(c.Channel)
+		cPairs[i] = c.Pair.String()
+		c.State = subscription.SubscribingState
+		if err := b.Websocket.AddSubscription(&c); err != nil {
+			return fmt.Errorf("%w Channel: %s Pair: %s Error: %w", stream.ErrSubscriptionFailure, c.Channel, c.Pair, err)
 		}
-		pair := subs[i].Pair.String()
-		if common.StringDataCompare(payload.MarketIDs, pair) {
-			continue
-		}
-		payload.MarketIDs = append(payload.MarketIDs, pair)
 	}
-
+	req := WsSubscribe{
+		MessageType: subscribe,
+		Channels:    cNames,
+		MarketIDs:   cPairs,
+	}
 	if authenticate {
 		creds, err := b.GetCredentials(context.TODO())
 		if err != nil {
@@ -410,16 +408,26 @@ func (b *BTCMarkets) Subscribe(subs []subscription.Subscription) error {
 			return err
 		}
 		sign := crypto.Base64Encode(tempSign)
-		payload.Key = creds.Key
-		payload.Signature = sign
-		payload.Timestamp = signTime
+		req.Key = creds.Key
+		req.Signature = sign
+		req.Timestamp = signTime
 	}
-
-	if err := b.Websocket.Conn.SendJSONMessage(payload); err != nil {
-		return err
+	respRaw, err := b.Websocket.Conn.SendMessageReturnResponse(id, req)
+	/*if err == nil {
+		if v, d, _, rErr := jsonparser.Get(respRaw, "result"); rErr != nil {
+			err = rErr
+		} else if d != jsonparser.Null { // null is the only expected and acceptable response
+			err = fmt.Errorf("%w: %s", errUnknownError, v)
+		}
+	}*/
+	if err != nil {
+		b.Websocket.RemoveSubscriptions(chans...)
+		err = fmt.Errorf("%w: %w; Channels: %s", stream.ErrSubscriptionFailure, err, strings.Join(cNames, ", "))
+		b.Websocket.DataHandler <- err
+	} else {
+		b.Websocket.AddSuccessfulSubscriptions(chans...)
 	}
-	b.Websocket.AddSuccessfulSubscriptions(subs...)
-	return nil
+	return err
 }
 
 // Unsubscribe sends a websocket message to manage and remove a subscription.
