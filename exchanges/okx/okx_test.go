@@ -57,10 +57,16 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	exchCfg.API.Credentials.Key = apiKey
-	exchCfg.API.Credentials.Secret = apiSecret
-	exchCfg.API.Credentials.ClientID = passphrase
 	ok.SetDefaults()
+	if apiKey != "" {
+		exchCfg.API.Credentials.Key = apiKey
+	}
+	if apiSecret != "" {
+		exchCfg.API.Credentials.Secret = apiSecret
+	}
+	if passphrase != "" {
+		exchCfg.API.Credentials.ClientID = passphrase
+	}
 	if apiKey != "" && apiSecret != "" && passphrase != "" {
 		exchCfg.API.AuthenticatedSupport = true
 		exchCfg.API.AuthenticatedWebsocketSupport = true
@@ -2959,10 +2965,10 @@ func TestBlockTickerSubscription(t *testing.T) {
 	}
 }
 
-func TestGenerateDefaultSubscriptions(t *testing.T) {
+func TestGenerateSubscriptions(t *testing.T) {
 	t.Parallel()
 
-	subs, err := ok.GenerateDefaultSubscriptions()
+	subs, err := ok.GenerateSubscriptions()
 	assert.NoError(t, err, "GenerateDefaultSubscriptions should not error")
 	expected := []subscription.Subscription{}
 	assets := ok.GetAssetTypes(true)
@@ -2973,24 +2979,14 @@ func TestGenerateDefaultSubscriptions(t *testing.T) {
 		}
 		s := *exp
 		s.Channel = channelName(s.Channel)
-		switch s.Channel {
-		case channelOrders:
-			for _, a := range assets {
-				s.Asset = a
+		for _, a := range assets {
+			pairs, err := ok.GetEnabledPairs(a)
+			assert.NoError(t, err, "GetEnabledPairs should not error")
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
 				expected = append(expected, s)
 			}
-		case channelCandle, channelTickers, channelFundingRate, channelPublicBlockTrades, channelBlockTickers, channelOpenInterest, channelPriceLimit, channelMarkPrice, channelMarkPriceCandle, channelTrades, channelTradesAll, opAmendOrder, opBatchAmendOrders, opBatchCancelOrders, opBatchOrders, opCancelOrder, opOrder, channelIndexCandle, channelIndexTickers, channelOrderBooks, channelOrderBooks5, channelOrderBooksTBT, channelOrderBooks50TBT:
-			for _, a := range assets {
-				pairs, err := ok.GetEnabledPairs(a)
-				assert.NoError(t, err, "GetEnabledPairs should not error")
-				s.Asset = a
-				for _, p := range pairs {
-					s.Pair = p
-					expected = append(expected, s)
-				}
-			}
-		default:
-			expected = append(expected, s)
 		}
 	}
 
@@ -3001,10 +2997,10 @@ func TestGenerateDefaultSubscriptions(t *testing.T) {
 
 // ************ Authenticated Websocket endpoints Test **********************************************
 
-func TestGenerateDefaultAuthSubscriptions(t *testing.T) {
+func TestGenerateAuthSubscriptions(t *testing.T) {
 	t.Parallel()
 
-	subs, err := ok.GenerateDefaultSubscriptions()
+	subs, err := ok.GenerateSubscriptions()
 	assert.NoError(t, err, "GenerateDefaultSubscriptions should not error")
 	ok.Websocket.SetCanUseAuthenticatedEndpoints(true)
 	expected := []subscription.Subscription{}
@@ -3019,7 +3015,7 @@ func TestGenerateDefaultAuthSubscriptions(t *testing.T) {
 				s.Asset = a
 				expected = append(expected, s)
 			}
-		case channelCandle, channelTickers, channelFundingRate, channelPublicBlockTrades, channelBlockTickers, channelOpenInterest, channelPriceLimit, channelMarkPrice, channelMarkPriceCandle, channelTrades, channelTradesAll, opAmendOrder, opBatchAmendOrders, opBatchCancelOrders, opBatchOrders, opCancelOrder, opOrder, channelIndexCandle, channelIndexTickers, channelOrderBooks, channelOrderBooks5, channelOrderBooksTBT, channelOrderBooks50TBT:
+		case channelCandle, channelTickers, channelTradesAll, channelOrderBooks, channelAccount:
 			for _, a := range assets {
 				pairs, err := ok.GetEnabledPairs(a)
 				assert.NoError(t, err, "GetEnabledPairs should not error")

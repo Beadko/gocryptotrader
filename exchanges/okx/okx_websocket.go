@@ -1234,7 +1234,7 @@ func channelName(name string) string {
 }
 
 // GenerateDefaultSubscriptions returns a list of default subscription message.
-func (ok *Okx) GenerateDefaultSubscriptions() ([]subscription.Subscription, error) {
+func (ok *Okx) GenerateSubscriptions() ([]subscription.Subscription, error) {
 	subscriptions := []subscription.Subscription{}
 	assets := ok.GetAssetTypes(true)
 	authed := ok.Websocket.CanUseAuthenticatedEndpoints()

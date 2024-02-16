@@ -237,7 +237,7 @@ func (ok *Okx) Setup(exch *config.Exchange) error {
 		Connector:                              ok.WsConnect,
 		Subscriber:                             ok.Subscribe,
 		Unsubscriber:                           ok.Unsubscribe,
-		GenerateSubscriptions:                  ok.GenerateDefaultSubscriptions,
+		GenerateSubscriptions:                  ok.GenerateSubscriptions,
 		Features:                               &ok.Features.Supports.WebsocketCapabilities,
 		MaxWebsocketSubscriptionsPerConnection: 240,
 		OrderbookBufferConfig: buffer.Config{
