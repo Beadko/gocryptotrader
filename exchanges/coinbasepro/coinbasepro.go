@@ -50,6 +50,16 @@ const (
 	coinbaseproWithdrawalCrypto        = "withdrawals/crypto"
 	coinbaseproCoinbaseAccounts        = "coinbase-accounts"
 	coinbaseproTrailingVolume          = "users/self/trailing-volume"
+
+	// Websocket channels
+	heartbeatsWsChannel   = "heartbeats"
+	candlesWsChannel      = "candles"
+	marketTradesWsChannel = "market_trades"
+	statusWsChannel       = "status"
+	tickerWsChannel       = "ticker"
+	tickerBatchWsChannel  = "ticker_batch"
+	orderbookL2WsChannel  = "level2"
+	userOrdersWsChannel   = "user"
 )
 
 // CoinbasePro is the overarching type across the coinbasepro package

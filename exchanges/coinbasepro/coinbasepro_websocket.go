@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/buger/jsonparser"
 	"github.com/gorilla/websocket"
 	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/common/convert"
@@ -27,6 +28,19 @@ import (
 const (
 	coinbaseproWebsocketURL = "wss://ws-feed.pro.coinbase.com"
 )
+
+var (
+	errUnknownError = errors.New("unknown error")
+)
+
+var subscriptionNames = map[string]string{
+	subscription.TickerChannel:    tickerWsChannel,
+	subscription.OrderbookChannel: orderbookL2WsChannel,
+	subscription.CandlesChannel:   candlesWsChannel,
+	subscription.AllTradesChannel: marketTradesWsChannel,
+	subscription.MyOrdersChannel:  userOrdersWsChannel,
+	// No equivalents for: AllTrades, AllOrders, MyTrades
+}
 
 // WsConnect initiates a websocket connection
 func (c *CoinbasePro) WsConnect() error {
@@ -366,40 +380,113 @@ func (c *CoinbasePro) ProcessUpdate(update *WebsocketL2Update) error {
 }
 
 // GenerateDefaultSubscriptions Adds default subscriptions to websocket to be handled by ManageSubscriptions()
-func (c *CoinbasePro) GenerateDefaultSubscriptions() ([]subscription.Subscription, error) {
-	var channels = []string{"heartbeat",
-		"level2_batch", /*Other orderbook feeds require authentication. This is batched in 50ms lots.*/
-		"ticker",
-		"user",
-		"matches"}
-	enabledPairs, err := c.GetEnabledPairs(asset.Spot)
-	if err != nil {
-		return nil, err
-	}
-	var subscriptions []subscription.Subscription
-	for i := range channels {
-		if (channels[i] == "user" || channels[i] == "full") &&
-			!c.IsWebsocketAuthenticationSupported() {
+func (c *CoinbasePro) GenerateSubscriptions() ([]subscription.Subscription, error) {
+	subscriptions := []subscription.Subscription{}
+	assets := c.GetAssetTypes(true)
+	authed := c.Websocket.CanUseAuthenticatedEndpoints()
+	for _, baseSub := range c.Features.Subscriptions {
+		if !authed && baseSub.Authenticated {
 			continue
 		}
-		for j := range enabledPairs {
-			fPair, err := c.FormatExchangeCurrency(enabledPairs[j],
-				asset.Spot)
+		s := *baseSub
+		s.Channel = channelName(s.Channel)
+		for _, a := range assets {
+			pairs, err := c.GetEnabledPairs(a)
 			if err != nil {
 				return nil, err
 			}
-			subscriptions = append(subscriptions, subscription.Subscription{
-				Channel: channels[i],
-				Pair:    fPair,
-				Asset:   asset.Spot,
-			})
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				subscriptions = append(subscriptions, s)
+			}
+			/*v ar channels = []string{"heartbeat",
+				"level2_batch", /*Other orderbook feeds require authentication. This is batched in 50ms lots.
+				"ticker",
+				"user",
+				"matches"}
+			enabledPairs, err := c.GetEnabledPairs(asset.Spot)
+			if err != nil {
+				return nil, err
+			}
+			var subscriptions []subscription.Subscription
+			for i := range channels {
+				if (channels[i] == "user" || channels[i] == "full") &&
+					!c.IsWebsocketAuthenticationSupported() {
+					continue
+				}
+				for j := range enabledPairs {
+					fPair, err := c.FormatExchangeCurrency(enabledPairs[j],
+						asset.Spot)
+					if err != nil {
+						return nil, err
+					}
+					subscriptions = append(subscriptions, subscription.Subscription{
+						Channel: channels[i],
+						Pair:    fPair,
+						Asset:   asset.Spot,
+					})
+				}
+			}
+			return subscriptions, nil */
 		}
 	}
 	return subscriptions, nil
 }
 
+// channelName converts global channel Names used in config of channel input into coinbasepro channel names
+// returns the name unchanged if no match is found
+func channelName(name string) string {
+	if s, ok := subscriptionNames[name]; ok {
+		return s
+	}
+	return name
+}
+
 // Subscribe sends a websocket message to receive data from the channel
-func (c *CoinbasePro) Subscribe(channelsToSubscribe []subscription.Subscription) error {
+func (c *CoinbasePro) Subscribe(chans []subscription.Subscription) error {
+	return c.ParallelChanOp(chans, c.subscribeToChan, 1)
+}
+
+func (c *CoinbasePro) subscribeToChan(chans []subscription.Subscription) error {
+	productIDs := make([]string, 0, len(chans))
+	subs := make([]WsChannels, 0, len(chans))
+	for i := range chans {
+		ch := &chans[i]
+		p := ch.Pair
+		if !p.IsEmpty() {
+			productIDs = append(productIDs, p.String())
+		}
+		oneSub := WsChannels{
+			Name:       ch.Channel,
+			ProductIDs: productIDs,
+		}
+		subs = append(subs, oneSub)
+	}
+	req := WebsocketSubscribe{
+		Type:     "subscribe",
+		Channels: subs,
+	}
+	respRaw, err := c.Websocket.Conn.SendMessageReturnResponse(productIDs, req)
+	if err == nil {
+		if v, d, _, rErr := jsonparser.Get(respRaw, "result"); rErr != nil {
+			err = rErr
+		} else if d != jsonparser.Null { // null is the only expected and acceptable response
+			err = fmt.Errorf("%w: %s", errUnknownError, v)
+		}
+	}
+	if err != nil {
+		c.Websocket.RemoveSubscriptions(chans...)
+		err = fmt.Errorf("%w: %w; Channels: %s", stream.ErrSubscriptionFailure, err, req.Channels)
+		c.Websocket.DataHandler <- err
+	} else {
+		c.Websocket.AddSuccessfulSubscriptions(chans...)
+	}
+
+	return err
+}
+
+func (c *CoinbasePro) Subscribe2(channelsToSubscribe []subscription.Subscription) error {
 	var creds *account.Credentials
 	var err error
 	if c.IsWebsocketAuthenticationSupported() {

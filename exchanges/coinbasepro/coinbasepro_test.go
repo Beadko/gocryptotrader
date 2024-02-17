@@ -9,7 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/common/convert"
 	"github.com/thrasher-corp/gocryptotrader/config"
@@ -22,6 +25,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/sharedtestvalues"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
+	testexch "github.com/thrasher-corp/gocryptotrader/internal/testing/exchange"
 	"github.com/thrasher-corp/gocryptotrader/portfolio/banking"
 	"github.com/thrasher-corp/gocryptotrader/portfolio/withdraw"
 )
@@ -50,9 +54,16 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatal("coinbasepro Setup() init error")
 	}
-	gdxConfig.API.Credentials.Key = apiKey
-	gdxConfig.API.Credentials.Secret = apiSecret
-	gdxConfig.API.Credentials.ClientID = clientID
+	gdxConfig.API.AuthenticatedSupport = true
+	if apiKey != "" {
+		gdxConfig.API.Credentials.Key = apiKey
+	}
+	if apiSecret != "" {
+		gdxConfig.API.Credentials.Secret = apiSecret
+	}
+	if clientID != "" {
+		gdxConfig.API.Credentials.ClientID = clientID
+	}
 	gdxConfig.API.AuthenticatedSupport = true
 	gdxConfig.API.AuthenticatedWebsocketSupport = true
 	c.Websocket = sharedtestvalues.NewTestWebsocket()
@@ -675,6 +686,82 @@ func TestGetDepositAddress(t *testing.T) {
 	_, err := c.GetDepositAddress(context.Background(), currency.BTC, "", "")
 	if err == nil {
 		t.Error("GetDepositAddress() error", err)
+	}
+}
+
+func TestSubscribe(t *testing.T) {
+	t.Parallel()
+
+	err := c.Subscribe([]subscription.Subscription{{
+		Channel: "ticker",
+		Pair:    testPair,
+	}})
+	testexch.SetupWs(t, c)
+
+	require.NoError(t, err, "Subscribe should not error")
+
+}
+
+// failing ad always logged in
+func TestGenerateSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	subs, err := c.GenerateSubscriptions()
+	assert.NoError(t, err, "GenerateDefaultSubscriptions should not error")
+	expected := []subscription.Subscription{}
+	assets := c.GetAssetTypes(true)
+	require.False(t, c.Websocket.CanUseAuthenticatedEndpoints(), "Websocket must not be authenticated by default")
+	for _, exp := range c.Features.Subscriptions {
+		if exp.Authenticated {
+			continue
+		}
+		s := *exp
+		s.Channel = channelName(s.Channel)
+		for _, a := range assets {
+			pairs, err := c.GetEnabledPairs(a)
+			assert.NoError(t, err, "GetEnabledPairs should not error")
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				expected = append(expected, s)
+			}
+		}
+	}
+	spew.Dump(expected)
+	spew.Dump(subs)
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when not logged in") {
+		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
+	}
+}
+
+func TestGenerateAuthSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	subs, err := c.GenerateSubscriptions()
+	assert.NoError(t, err, "GenerateDefaultSubscriptions should not error")
+	expected := []subscription.Subscription{}
+	assets := c.GetAssetTypes(true)
+	c.Websocket.SetCanUseAuthenticatedEndpoints(true)
+	for _, exp := range c.Features.Subscriptions {
+		if exp.Authenticated {
+			continue
+		}
+		s := *exp
+		s.Channel = channelName(s.Channel)
+		for _, a := range assets {
+			pairs, err := c.GetEnabledPairs(a)
+			assert.NoError(t, err, "GetEnabledPairs should not error")
+			s.Asset = a
+			for _, p := range pairs {
+				s.Pair = p
+				expected = append(expected, s)
+			}
+		}
+	}
+	spew.Dump(expected)
+	spew.Dump(subs)
+	if !assert.Equal(t, len(expected), len(subs), "Should generate the correct number of subscriptions when logged in") {
+		//assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
 	}
 }
 

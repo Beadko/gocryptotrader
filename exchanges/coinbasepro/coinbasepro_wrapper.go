@@ -23,6 +23,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/request"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream/buffer"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/trade"
 	"github.com/thrasher-corp/gocryptotrader/log"
@@ -128,6 +129,13 @@ func (c *CoinbasePro) SetDefaults() {
 				GlobalResultLimit: 300,
 			},
 		},
+		Subscriptions: []*subscription.Subscription{
+			{Enabled: true, Channel: subscription.TickerChannel},    // marketTickerChannel
+			{Enabled: true, Channel: subscription.AllTradesChannel}, // marketMatchChannel
+			{Enabled: true, Channel: subscription.OrderbookChannel, Interval: kline.HundredMilliseconds},
+			{Enabled: true, Channel: subscription.CandlesChannel, Interval: kline.OneMin},
+			{Enabled: true, Channel: subscription.MyOrdersChannel, Authenticated: true},
+		},
 	}
 
 	c.Requester, err = request.New(c.Name,
@@ -178,7 +186,7 @@ func (c *CoinbasePro) Setup(exch *config.Exchange) error {
 		Connector:             c.WsConnect,
 		Subscriber:            c.Subscribe,
 		Unsubscriber:          c.Unsubscribe,
-		GenerateSubscriptions: c.GenerateDefaultSubscriptions,
+		GenerateSubscriptions: c.GenerateSubscriptions,
 		Features:              &c.Features.Supports.WebsocketCapabilities,
 		OrderbookBufferConfig: buffer.Config{
 			SortBuffer: true,
