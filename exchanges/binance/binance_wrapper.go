@@ -211,7 +211,7 @@ func (b *Binance) SetDefaults() {
 				GlobalResultLimit: 1000,
 			},
 		},
-		Subscriptions: []*subscription.Subscription{
+		Subscriptions: subscription.List{
 			{Enabled: true, Channel: subscription.TickerChannel},
 			{Enabled: true, Channel: subscription.AllTradesChannel},
 			{Enabled: true, Channel: subscription.CandlesChannel, Interval: kline.OneMin},
