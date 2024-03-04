@@ -333,13 +333,11 @@ func (b *BTCMarkets) generateDefaultSubscriptions() (subscription.List, error) {
 	}
 	var subscriptions subscription.List
 	for i := range channels {
-		for j := range enabledCurrencies {
-			subscriptions = append(subscriptions, &subscription.Subscription{
-				Channel: channels[i],
-				Pairs:   currency.Pairs{enabledCurrencies[j]},
-				Asset:   asset.Spot,
-			})
-		}
+		subscriptions = append(subscriptions, &subscription.Subscription{
+			Channel: channels[i],
+			Pairs:   enabledCurrencies,
+			Asset:   asset.Spot,
+		})
 	}
 
 	if b.Websocket.CanUseAuthenticatedEndpoints() {
@@ -354,29 +352,20 @@ func (b *BTCMarkets) generateDefaultSubscriptions() (subscription.List, error) {
 
 // Subscribe sends a websocket message to receive data from the channel
 func (b *BTCMarkets) Subscribe(subs subscription.List) error {
-	payload := &WsSubscribe{
+	baseReq := WsSubscribe{
 		MessageType: subscribe,
 	}
-
 	if len(b.Websocket.GetSubscriptions()) != 0 {
-		payload.MessageType = addSubscription
-		payload.ClientType = clientType
+		baseReq.MessageType = addSubscription
+		baseReq.ClientType = clientType
 	}
 
 	var authenticate bool
-	for i := range subs {
-		if !authenticate && common.StringDataContains(authChannels, subs[i].Channel) {
+	for _, s := range subs {
+		if common.StringDataContains(authChannels, s.Channel) {
 			authenticate = true
+			break
 		}
-		payload.Channels = append(payload.Channels, subs[i].Channel)
-		if len(subs[i].Pairs) == 0 || subs[i].Pairs[0].IsEmpty() {
-			continue
-		}
-		pair := subs[i].Pairs[0].String()
-		if common.StringDataCompare(payload.MarketIDs, pair) {
-			continue
-		}
-		payload.MarketIDs = append(payload.MarketIDs, pair)
 	}
 
 	if authenticate {
@@ -387,50 +376,60 @@ func (b *BTCMarkets) Subscribe(subs subscription.List) error {
 		signTime := strconv.FormatInt(time.Now().UnixMilli(), 10)
 		strToSign := "/users/self/subscribe" + "\n" + signTime
 		var tempSign []byte
-		tempSign, err = crypto.GetHMAC(crypto.HashSHA512,
-			[]byte(strToSign),
-			[]byte(creds.Secret))
+		tempSign, err = crypto.GetHMAC(crypto.HashSHA512, []byte(strToSign), []byte(creds.Secret))
 		if err != nil {
 			return err
 		}
 		sign := crypto.Base64Encode(tempSign)
-		payload.Key = creds.Key
-		payload.Signature = sign
-		payload.Timestamp = signTime
+		baseReq.Key = creds.Key
+		baseReq.Signature = sign
+		baseReq.Timestamp = signTime
 	}
 
-	err := b.Websocket.Conn.SendJSONMessage(payload)
-	if err == nil {
-		err = b.Websocket.AddSuccessfulSubscriptions(subs...)
+	var errs error
+	for i, s := range subs {
+		if i == 1 {
+			baseReq.MessageType = addSubscription
+			baseReq.ClientType = clientType
+		}
+
+		req := baseReq
+
+		req.Channels = []string{s.Channel}
+		req.MarketIDs = s.Pairs.Strings()
+
+		err := b.Websocket.Conn.SendJSONMessage(req)
+		if err == nil {
+			err = b.Websocket.AddSuccessfulSubscriptions(s)
+		}
+		if err != nil {
+			errs = common.AppendError(errs, err)
+		}
 	}
 
-	return err
+	return errs
 }
 
 // Unsubscribe sends a websocket message to manage and remove a subscription.
 func (b *BTCMarkets) Unsubscribe(subs subscription.List) error {
-	payload := WsSubscribe{
-		MessageType: removeSubscription,
-		ClientType:  clientType,
-	}
-	for i := range subs {
-		payload.Channels = append(payload.Channels, subs[i].Channel)
-		if len(subs[i].Pairs) == 0 || subs[i].Pairs[0].IsEmpty() {
-			continue
+	var errs error
+	for _, s := range subs {
+		req := WsSubscribe{
+			MessageType: removeSubscription,
+			ClientType:  clientType,
+			Channels:    []string{s.Channel},
+			MarketIDs:   s.Pairs.Strings(),
 		}
 
-		pair := subs[i].Pairs[0].String()
-		if common.StringDataCompare(payload.MarketIDs, pair) {
-			continue
+		err := b.Websocket.Conn.SendJSONMessage(req)
+		if err == nil {
+			err = b.Websocket.RemoveSubscriptions(s)
 		}
-		payload.MarketIDs = append(payload.MarketIDs, pair)
+		if err != nil {
+			errs = common.AppendError(errs, err)
+		}
 	}
-
-	err := b.Websocket.Conn.SendJSONMessage(payload)
-	if err == nil {
-		err = b.Websocket.RemoveSubscriptions(subs...)
-	}
-	return err
+	return errs
 }
 
 // ReSubscribeSpecificOrderbook removes the subscription and the subscribes
