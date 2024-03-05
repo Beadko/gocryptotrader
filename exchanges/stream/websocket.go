@@ -30,6 +30,7 @@ var (
 	ErrChannelInStateAlready    = errors.New("channel already in state")
 	ErrAlreadyDisabled          = errors.New("websocket already disabled")
 	ErrNotConnected             = errors.New("websocket is not connected")
+	ErrNoSubscriptionsSupplied  = errors.New("no subscriptions supplied")
 )
 
 // Private websocket errors
@@ -57,7 +58,6 @@ var (
 	errClosedConnection                     = errors.New("use of closed network connection")
 	errSubscriptionsExceedsLimit            = errors.New("subscriptions exceeds limit")
 	errInvalidMaxSubscriptions              = errors.New("max subscriptions cannot be less than 0")
-	errNoSubscriptionsSupplied              = errors.New("no subscriptions supplied")
 	errChannelAlreadySubscribed             = errors.New("channel already subscribed")
 	errInvalidChannelState                  = errors.New("invalid Channel state")
 	errSameProxyAddress                     = errors.New("cannot set proxy address to the same address")
@@ -66,6 +66,7 @@ var (
 	errCannotShutdown                       = errors.New("websocket cannot shutdown")
 	errAlreadyReconnecting                  = errors.New("websocket in the process of reconnection")
 	errConnSetup                            = errors.New("error in connection setup")
+	errCannotStartConnMonitor               = errors.New("cannot start websocket connection monitor")
 )
 
 var (
@@ -295,7 +296,7 @@ func (w *Websocket) Connect() error {
 	if !w.IsConnectionMonitorRunning() {
 		err = w.connectionMonitor()
 		if err != nil {
-			log.Errorf(log.WebsocketMgr, "%s cannot start websocket connection monitor %v", w.GetName(), err)
+			return fmt.Errorf("%s %w", w.exchangeName, errCannotStartConnMonitor)
 		}
 	}
 
@@ -308,7 +309,7 @@ func (w *Websocket) Connect() error {
 	}
 	err = w.checkSubscriptions(subs)
 	if err != nil {
-		return fmt.Errorf("%s websocket: %w", w.exchangeName, common.AppendError(ErrSubscriptionFailure, err))
+		return fmt.Errorf("%s websocket: %w", w.exchangeName, common.AppendError(ErrNoSubscriptionsSupplied, err))
 	}
 	err = w.Subscriber(subs)
 	if err != nil {
@@ -817,7 +818,7 @@ func (w *Websocket) GetChannelDifference(genSubs []subscription.Subscription) (s
 // UnsubscribeChannels unsubscribes from a websocket channel
 func (w *Websocket) UnsubscribeChannels(channels []subscription.Subscription) error {
 	if len(channels) == 0 {
-		return fmt.Errorf("%s websocket: %w", w.exchangeName, errNoSubscriptionsSupplied)
+		return fmt.Errorf("%s websocket: %w", w.exchangeName, ErrNoSubscriptionsSupplied)
 	}
 	w.subscriptionMutex.RLock()
 
@@ -986,7 +987,7 @@ func checkWebsocketURL(s string) error {
 // and if the subscription already exists.
 func (w *Websocket) checkSubscriptions(subs []subscription.Subscription) error {
 	if len(subs) == 0 {
-		return errNoSubscriptionsSupplied
+		return ErrNoSubscriptionsSupplied
 	}
 
 	w.subscriptionMutex.RLock()

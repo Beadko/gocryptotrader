@@ -23,6 +23,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/config"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/protocol"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/stream/buffer"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 )
 
@@ -177,6 +178,13 @@ func TestSetup(t *testing.T) {
 	err = w.Setup(websocketSetup)
 	assert.ErrorIs(t, err, errInvalidTrafficTimeout, "Setup should error correctly")
 
+	websocketSetup.ExchangeConfig.Orderbook = config.Orderbook{
+		WebsocketBufferEnabled: true,
+		WebsocketBufferLimit:   0,
+	}
+	err = w.Setup(websocketSetup)
+	assert.ErrorIs(t, err, buffer.ErrIssueBufferEnabledButNoLimit, "Setup should error correctly")
+
 	websocketSetup.ExchangeConfig.WebsocketTrafficTimeout = time.Minute
 	err = w.Setup(websocketSetup)
 	assert.NoError(t, err, "Setup should not error")
@@ -296,7 +304,8 @@ func TestIsDisconnectionError(t *testing.T) {
 	assert.True(t, IsDisconnectionError(&net.OpError{Err: errors.New("errText")}), "IsDisconnectionError should return true")
 }
 
-func TestConnectionMessageErrors(t *testing.T) {
+// TestConnect exercises Connect
+func TestConnect(t *testing.T) {
 	t.Parallel()
 	var wsWrong = &Websocket{}
 	err := wsWrong.Connect()
@@ -316,6 +325,14 @@ func TestConnectionMessageErrors(t *testing.T) {
 	wsWrong.connector = func() error { return errDastardlyReason }
 	err = wsWrong.Connect()
 	assert.ErrorIs(t, err, errDastardlyReason, "Connect should error correctly")
+
+	/* wsWrong.setConnectionMonitorRunning(true)
+	err = wsWrong.connectionMonitor()
+	assert.ErrorIs(t, err, errCannotStartConnMonitor, "Connect should error correctly")*/
+
+	/*subs := make([]subscription.Subscription, 0)
+	err = wsWrong.Connect()
+	assert.ErrorIs(t, err, ErrNoSubscriptionsSupplied, "Connect should error correctly")*/
 
 	ws := NewWebsocket()
 	err = ws.Setup(defaultSetup)
@@ -462,7 +479,7 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 
 	subs, err := ws.GenerateSubs()
 	assert.NoError(t, err, "Generating test subscriptions should not error")
-	assert.ErrorIs(t, ws.UnsubscribeChannels(nil), errNoSubscriptionsSupplied, "Unsubscribing from nil should error")
+	assert.ErrorIs(t, ws.UnsubscribeChannels(nil), ErrNoSubscriptionsSupplied, "Unsubscribing from nil should error")
 	assert.ErrorIs(t, ws.UnsubscribeChannels(subs), ErrSubscriptionNotFound, "Unsubscribing should error when not subscribed")
 	assert.Nil(t, ws.GetSubscription(42), "GetSubscription on empty internal map should return")
 	assert.NoError(t, ws.SubscribeToChannels(subs), "Basic Subscribing should not error")
@@ -484,7 +501,7 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 	assert.Nil(t, ws.GetSubscription(nil), "GetSubscription by nil should return nil")
 	assert.Nil(t, ws.GetSubscription(45), "GetSubscription by invalid key should return nil")
 	assert.ErrorIs(t, ws.SubscribeToChannels(subs), errChannelAlreadySubscribed, "Subscribe should error when already subscribed")
-	assert.ErrorIs(t, ws.SubscribeToChannels(nil), errNoSubscriptionsSupplied, "Subscribe to nil should error")
+	assert.ErrorIs(t, ws.SubscribeToChannels(nil), ErrNoSubscriptionsSupplied, "Subscribe to nil should error")
 	assert.NoError(t, ws.UnsubscribeChannels(subs), "Unsubscribing should not error")
 }
 
@@ -1256,7 +1273,7 @@ func TestCheckSubscriptions(t *testing.T) {
 	t.Parallel()
 	ws := Websocket{}
 	err := ws.checkSubscriptions(nil)
-	assert.ErrorIs(t, err, errNoSubscriptionsSupplied, "checkSubscriptions should error correctly")
+	assert.ErrorIs(t, err, ErrNoSubscriptionsSupplied, "checkSubscriptions should error correctly")
 
 	ws.MaxSubscriptionsPerConnection = 1
 

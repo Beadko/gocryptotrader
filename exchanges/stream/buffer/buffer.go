@@ -14,41 +14,46 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/log"
 )
 
-const packageError = "websocket orderbook buffer error: %w"
+const errBufferSetup = "websocket orderbook buffer error: %w"
 
+// public errors
 var (
-	errExchangeConfigNil            = errors.New("exchange config is nil")
-	errBufferConfigNil              = errors.New("buffer config is nil")
-	errUnsetDataHandler             = errors.New("datahandler unset")
-	errIssueBufferEnabledButNoLimit = errors.New("buffer enabled but no limit set")
-	errUpdateIsNil                  = errors.New("update is nil")
-	errUpdateNoTargets              = errors.New("update bid/ask targets cannot be nil")
-	errDepthNotFound                = errors.New("orderbook depth not found")
-	errRESTOverwrite                = errors.New("orderbook has been overwritten by REST protocol")
-	errInvalidAction                = errors.New("invalid action")
-	errAmendFailure                 = errors.New("orderbook amend update failure")
-	errDeleteFailure                = errors.New("orderbook delete update failure")
-	errInsertFailure                = errors.New("orderbook insert update failure")
-	errUpdateInsertFailure          = errors.New("orderbook update/insert update failure")
-	errRESTTimerLapse               = errors.New("rest sync timer lapse with active websocket connection")
-	errOrderbookFlushed             = errors.New("orderbook flushed")
+	ErrIssueBufferEnabledButNoLimit = errors.New("buffer enabled but no limit set")
+)
+
+// private errors
+var (
+	errExchangeConfigNil   = errors.New("exchange config is nil")
+	errBufferConfigNil     = errors.New("buffer config is nil")
+	errUnsetDataHandler    = errors.New("datahandler unset")
+	errUpdateIsNil         = errors.New("update is nil")
+	errUpdateNoTargets     = errors.New("update bid/ask targets cannot be nil")
+	errDepthNotFound       = errors.New("orderbook depth not found")
+	errRESTOverwrite       = errors.New("orderbook has been overwritten by REST protocol")
+	errInvalidAction       = errors.New("invalid action")
+	errAmendFailure        = errors.New("orderbook amend update failure")
+	errDeleteFailure       = errors.New("orderbook delete update failure")
+	errInsertFailure       = errors.New("orderbook insert update failure")
+	errUpdateInsertFailure = errors.New("orderbook update/insert update failure")
+	errRESTTimerLapse      = errors.New("rest sync timer lapse with active websocket connection")
+	errOrderbookFlushed    = errors.New("orderbook flushed")
 )
 
 // Setup sets private variables
 func (w *Orderbook) Setup(exchangeConfig *config.Exchange, c *Config, dataHandler chan<- interface{}) error {
 	if exchangeConfig == nil { // exchange config fields are checked in stream package
 		// prior to calling this, so further checks are not needed.
-		return fmt.Errorf(packageError, errExchangeConfigNil)
+		return fmt.Errorf(errBufferSetup, errExchangeConfigNil)
 	}
 	if c == nil {
-		return fmt.Errorf(packageError, errBufferConfigNil)
+		return fmt.Errorf(errBufferSetup, errBufferConfigNil)
 	}
 	if dataHandler == nil {
-		return fmt.Errorf(packageError, errUnsetDataHandler)
+		return fmt.Errorf(errBufferSetup, errUnsetDataHandler)
 	}
 	if exchangeConfig.Orderbook.WebsocketBufferEnabled &&
 		exchangeConfig.Orderbook.WebsocketBufferLimit < 1 {
-		return fmt.Errorf(packageError, errIssueBufferEnabledButNoLimit)
+		return fmt.Errorf(errBufferSetup, ErrIssueBufferEnabledButNoLimit)
 	}
 
 	// NOTE: These variables are set by config.json under "orderbook" for each
@@ -78,10 +83,10 @@ func (w *Orderbook) Setup(exchangeConfig *config.Exchange, c *Config, dataHandle
 // validate validates update against setup values
 func (w *Orderbook) validate(u *orderbook.Update) error {
 	if u == nil {
-		return fmt.Errorf(packageError, errUpdateIsNil)
+		return fmt.Errorf(errBufferSetup, errUpdateIsNil)
 	}
 	if len(u.Bids) == 0 && len(u.Asks) == 0 {
-		return fmt.Errorf(packageError, errUpdateNoTargets)
+		return fmt.Errorf(errBufferSetup, errUpdateNoTargets)
 	}
 	return nil
 }

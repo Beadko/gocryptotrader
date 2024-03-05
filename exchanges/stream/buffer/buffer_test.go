@@ -843,8 +843,8 @@ func TestSetup(t *testing.T) {
 
 	exchangeConfig.Orderbook.WebsocketBufferEnabled = true
 	err = w.Setup(exchangeConfig, bufferConf, make(chan interface{}))
-	if !errors.Is(err, errIssueBufferEnabledButNoLimit) {
-		t.Fatalf("expected error %v but received %v", errIssueBufferEnabledButNoLimit, err)
+	if !errors.Is(err, ErrIssueBufferEnabledButNoLimit) {
+		t.Fatalf("expected error %v but received %v", ErrIssueBufferEnabledButNoLimit, err)
 	}
 
 	exchangeConfig.Orderbook.WebsocketBufferLimit = 1337
