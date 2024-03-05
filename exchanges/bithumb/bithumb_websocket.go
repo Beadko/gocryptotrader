@@ -21,6 +21,28 @@ const (
 	tradeTimeLayout  = time.DateTime + ".000000"
 )
 
+const (
+	// public channels
+	tickerChannel            = "TICKER"
+	orderbookChannel         = "ORDERBOOK"
+	tradeChannel             = "TRADE"
+	contractTickerChannel    = "CONTRACT_TICKER"
+	contractOrderbookChannel = "CONTRACT_ORDERBOOK"
+
+	// private channels
+	orderChannel    = "CONTRACT_ORDER"
+	assetChannel    = "CONTRACT_ASSET"
+	positionChannel = "POSITION_CHANNEL"
+	infoChannel     = "CONTRACT_INFO"
+)
+
+var subscriptionNames = map[string]string{
+	subscription.TickerChannel:    tickerChannel,
+	subscription.OrderbookChannel: orderbookChannel,
+	subscription.AllTradesChannel: tradeChannel,
+	subscription.MyOrdersChannel:  orderChannel,
+	// No equivalents for:CandlesChannel, AllOrders, MyTrades
+}
 var (
 	wsDefaultTickTypes = []string{"30M"} // alternatives "1H", "12H", "24H", "MID"
 	location           *time.Location
@@ -180,16 +202,22 @@ func (b *Bithumb) GenerateSubscriptions() (subscription.List, error) {
 	if err != nil {
 		return nil, err
 	}
-	pairs = pairs.Format(pFmt)
-
-	for y := range channels {
-		subscriptions = append(subscriptions, &subscription.Subscription{
-			Channel: channels[y],
-			Pairs:   pairs,
-			Asset:   asset.Spot,
-		})
+	for _, baseSub := range b.Features.Subscriptions {
+		baseSub.Channel = channelName(baseSub.Channel)
+		for _, p := range pairs {
+			s := baseSub.Clone()
+			s.Pair = p.Format(pFmt)
+			subscriptions = append(subscriptions, s)
+		}
 	}
 	return subscriptions, nil
+}
+
+func channelName(name string) string {
+	if s, ok := subscriptionNames[name]; ok {
+		return s
+	}
+	return name
 }
 
 // Subscribe subscribes to a set of channels

@@ -52,8 +52,13 @@ type Subscription struct {
 	Interval      kline.Interval         `json:"interval,omitempty"`
 	Levels        int                    `json:"levels,omitempty"`
 	Authenticated bool                   `json:"authenticated,omitempty"`
+<<<<<<< HEAD
 	state         State
 	m             sync.RWMutex
+||||||| parent of 210fb1ce (Bithumb: Update GenerateSubscriptions WIP)
+=======
+	m             sync.RWMutex
+>>>>>>> 210fb1ce (Bithumb: Update GenerateSubscriptions WIP)
 }
 
 // MatchableKey interface should be implemented by Key types which want a more complex matching than a simple key equality check
@@ -96,6 +101,7 @@ func (s *Subscription) EnsureKeyed() any {
 	}
 	return s.Key
 }
+<<<<<<< HEAD
 
 // Match returns if the two keys match Channels, Assets, Pairs, Interval and Levels:
 // Key Pairs comparison:
@@ -136,3 +142,15 @@ func (s *Subscription) Clone() *Subscription {
 	n.m = sync.RWMutex{}
 	return &n
 }
+||||||| parent of 210fb1ce (Bithumb: Update GenerateSubscriptions WIP)
+=======
+
+// Clone returns a copy of a subscription
+func (s *Subscription) Clone() *Subscription {
+	s.m.RLock()
+	n := *s //nolint:govet // Replacing lock immediately below
+	s.m.RUnlock()
+	n.m = sync.RWMutex{}
+	return &n
+}
+>>>>>>> 210fb1ce (Bithumb: Update GenerateSubscriptions WIP)
