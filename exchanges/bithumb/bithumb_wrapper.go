@@ -138,9 +138,7 @@ func (b *Bithumb) SetDefaults() {
 		Subscriptions: []*subscription.Subscription{
 			// Where we can we use generic names
 			{Enabled: true, Channel: subscription.TickerChannel},
-			{Enabled: true, Channel: subscription.AllTradesChannel},
-			{Enabled: true, Channel: subscription.OrderbookChannel, Interval: kline.HundredMilliseconds},
-			{Enabled: true, Channel: subscription.MyOrdersChannel, Authenticated: true},
+			{Enabled: true, Channel: subscription.OrderbookChannel, Interval: kline.HundredMilliseconds, Levels: 2},
 		},
 	}
 	b.Requester, err = request.New(b.Name,

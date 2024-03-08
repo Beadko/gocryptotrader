@@ -23,25 +23,14 @@ const (
 
 const (
 	// public channels
-	tickerChannel            = "TICKER"
-	orderbookChannel         = "ORDERBOOK"
-	tradeChannel             = "TRADE"
-	contractTickerChannel    = "CONTRACT_TICKER"
-	contractOrderbookChannel = "CONTRACT_ORDERBOOK"
-
-	// private channels
-	orderChannel    = "CONTRACT_ORDER"
-	assetChannel    = "CONTRACT_ASSET"
-	positionChannel = "POSITION_CHANNEL"
-	infoChannel     = "CONTRACT_INFO"
+	tickerChannel    = "ticker"
+	orderbookChannel = "orderbook"
 )
 
 var subscriptionNames = map[string]string{
 	subscription.TickerChannel:    tickerChannel,
 	subscription.OrderbookChannel: orderbookChannel,
-	subscription.AllTradesChannel: tradeChannel,
-	subscription.MyOrdersChannel:  orderChannel,
-	// No equivalents for:CandlesChannel, AllOrders, MyTrades
+	// No equivalents for:CandlesChannel, AllTradesChannel, MyOrdersChannel, AllOrders, MyTrades
 }
 var (
 	wsDefaultTickTypes = []string{"30M"} // alternatives "1H", "12H", "24H", "MID"
@@ -191,24 +180,21 @@ func (b *Bithumb) wsHandleData(respRaw []byte) error {
 
 // GenerateSubscriptions generates the default subscription set
 func (b *Bithumb) GenerateSubscriptions() (subscription.List, error) {
-	var channels = []string{"ticker", "transaction", "orderbookdepth"}
 	var subscriptions subscription.List
 	pairs, err := b.GetEnabledPairs(asset.Spot)
 	if err != nil {
 		return nil, err
 	}
 
-	pFmt, err := b.GetPairFormat(asset.Spot, true)
+	/*pFmt, err := b.GetPairFormat(asset.Spot, true)
 	if err != nil {
 		return nil, err
-	}
+	}*/
 	for _, baseSub := range b.Features.Subscriptions {
 		baseSub.Channel = channelName(baseSub.Channel)
-		for _, p := range pairs {
-			s := baseSub.Clone()
-			s.Pair = p.Format(pFmt)
-			subscriptions = append(subscriptions, s)
-		}
+		s := baseSub.Clone()
+		s.Pairs = pairs
+		subscriptions = append(subscriptions, s)
 	}
 	return subscriptions, nil
 }
@@ -221,9 +207,15 @@ func channelName(name string) string {
 }
 
 // Subscribe subscribes to a set of channels
-func (b *Bithumb) Subscribe(channelsToSubscribe subscription.List) error {
+func (b *Bithumb) Subscribe(chans subscription.List) error {
+	return b.ParallelChanOp(chans, b.subscribeToChan, 1)
+
+}
+
+func (b *Bithumb) subscribeToChan(chans subscription.List) error {
+
 	var errs error
-	for _, s := range channelsToSubscribe {
+	for _, s := range chans {
 		req := &WsSubscribe{
 			Type:    s.Channel,
 			Symbols: s.Pairs,

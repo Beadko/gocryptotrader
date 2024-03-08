@@ -2,12 +2,15 @@ package bithumb
 
 import (
 	"errors"
+	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/thrasher-corp/gocryptotrader/currency"
 	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
 )
 
@@ -45,6 +48,7 @@ func TestWsHandleData(t *testing.T) {
 				},
 			},
 			Websocket: &stream.Websocket{
+				Wg:          *new(sync.WaitGroup),
 				DataHandler: make(chan interface{}, 1),
 			},
 		},
@@ -89,11 +93,19 @@ func TestWsHandleData(t *testing.T) {
 
 func TestGenerateSubscriptions(t *testing.T) {
 	t.Parallel()
-	sub, err := b.GenerateSubscriptions()
-	if err != nil {
-		t.Fatal(err)
+
+	expected := subscription.List{}
+	pairs, err := b.GetEnabledPairs(asset.Spot)
+	assert.NoError(t, err, "GetEnabledPairs should not error")
+	for _, baseSub := range b.Features.Subscriptions {
+		baseSub.Channel = channelName(baseSub.Channel)
+		s := baseSub.Clone()
+		s.Pairs = pairs
+		expected = append(expected, s)
 	}
-	if sub == nil {
-		t.Fatal("unexpected value")
+	subs, err := b.GenerateSubscriptions()
+	assert.NoError(t, err, "GenerateSubscriptions should not error")
+	if assert.Len(t, subs, len(expected), "Should have the correct number of subs") {
+		assert.ElementsMatch(t, subs, expected, "Should get the correct subscriptions")
 	}
 }
