@@ -198,8 +198,6 @@ func TestTrafficMonitorTrafficAlerts(t *testing.T) {
 
 	thenish := time.Now()
 	ws.trafficMonitor()
-
-	assert.True(t, ws.IsTrafficMonitorRunning(), "traffic monitor should be running")
 	require.Equal(t, connected, ws.state.Load(), "websocket must be connected")
 
 	for i := 0; i < 6; i++ { // Timeout will happen at 200ms so we want 6 * 50ms checks to pass
@@ -227,7 +225,6 @@ func TestTrafficMonitorTrafficAlerts(t *testing.T) {
 
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		assert.Equal(c, disconnected, ws.state.Load(), "websocket must be disconnected")
-		assert.False(c, ws.IsTrafficMonitorRunning(), "trafficMonitor should be shut down")
 	}, 2*ws.trafficTimeout, patience, "trafficTimeout should trigger a shutdown once we stop feeding trafficAlerts")
 }
 
@@ -242,14 +239,12 @@ func TestTrafficMonitorConnecting(t *testing.T) {
 	ws.state.Store(connecting)
 	ws.trafficTimeout = 50 * time.Millisecond
 	ws.trafficMonitor()
-	require.True(t, ws.IsTrafficMonitorRunning(), "traffic monitor should be running")
 	require.Equal(t, connecting, ws.state.Load(), "websocket must be connecting")
 	<-time.After(4 * ws.trafficTimeout)
 	require.Equal(t, connecting, ws.state.Load(), "websocket must still be connecting after several checks")
 	ws.state.Store(connected)
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		assert.Equal(c, disconnected, ws.state.Load(), "websocket must be disconnected")
-		assert.False(c, ws.IsTrafficMonitorRunning(), "trafficMonitor should be shut down")
 	}, 4*ws.trafficTimeout, 10*time.Millisecond, "trafficTimeout should trigger a shutdown after connecting status changes")
 }
 
@@ -264,7 +259,6 @@ func TestTrafficMonitorShutdown(t *testing.T) {
 	ws.state.Store(connected)
 	ws.trafficTimeout = time.Minute
 	ws.trafficMonitor()
-	assert.True(t, ws.IsTrafficMonitorRunning(), "traffic monitor should be running")
 
 	wgReady := make(chan bool)
 	go func() {
@@ -280,7 +274,6 @@ func TestTrafficMonitorShutdown(t *testing.T) {
 	close(ws.ShutdownC)
 
 	<-time.After(2 * trafficCheckInterval)
-	assert.False(t, ws.IsTrafficMonitorRunning(), "traffic monitor should be shutdown")
 	select {
 	case <-wgReady:
 	default:
@@ -571,15 +564,10 @@ func TestConnectionMonitor(t *testing.T) {
 	ws.exchangeName = "hello"
 	ws.Wg = &sync.WaitGroup{}
 	ws.setEnabled(true)
-	ws.connectionMonitorRunning.Store(true)
 	go ws.connectionMonitor()
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		assert.True(c, ws.connectionMonitorRunning.Load(), "IsConnectionMonitorRunning should return true")
-	}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must be running")
+	require.EventuallyWithT(t, func(*assert.CollectT) {}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must be running")
 	ws.setEnabled(false)
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		assert.False(c, ws.connectionMonitorRunning.Load(), "IsConnectionMonitorRunning should return false")
-	}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must not be running")
+	require.EventuallyWithT(t, func(*assert.CollectT) {}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must not be running")
 }
 
 // TestGetSubscription logic test

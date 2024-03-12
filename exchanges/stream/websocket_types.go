@@ -38,9 +38,6 @@ type Websocket struct {
 	enabled                      atomic.Bool
 	state                        atomic.Uint32
 	verbose                      bool
-	connectionMonitorRunning     atomic.Bool
-	trafficMonitorRunning        atomic.Bool
-	dataMonitorRunning           atomic.Bool
 	trafficTimeout               time.Duration
 	connectionMonitorDelay       time.Duration
 	proxyAddr                    string
