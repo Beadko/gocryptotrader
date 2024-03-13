@@ -565,9 +565,9 @@ func TestConnectionMonitor(t *testing.T) {
 	ws.Wg = &sync.WaitGroup{}
 	ws.setEnabled(true)
 	go ws.connectionMonitor()
-	require.EventuallyWithT(t, func(*assert.CollectT) {}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must be running")
-	ws.setEnabled(false)
-	require.EventuallyWithT(t, func(*assert.CollectT) {}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must not be running")
+	require.Eventually(t, func() bool {
+		return ws.connectionMonitorRunning.Load()
+	}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must be running")
 }
 
 // TestGetSubscription logic test

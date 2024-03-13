@@ -361,6 +361,9 @@ func (w *Websocket) dataMonitor() {
 
 // connectionMonitor ensures that the WS keeps connecting
 func (w *Websocket) connectionMonitor() {
+	if !w.connectionMonitorRunning.CompareAndSwap(false, true) {
+		return
+	}
 	delay := w.connectionMonitorDelay
 	timer := time.NewTimer(delay)
 	for {
@@ -380,6 +383,7 @@ func (w *Websocket) connectionMonitor() {
 				log.Debugf(log.WebsocketMgr, "%v websocket: connection monitor exiting", w.exchangeName)
 			}
 			timer.Stop()
+			w.connectionMonitorRunning.Store(false)
 			return
 		}
 		select {
