@@ -317,11 +317,6 @@ func (w *Websocket) Disable() error {
 	if !w.IsEnabled() {
 		return fmt.Errorf("%s %w", w.exchangeName, ErrAlreadyDisabled)
 	}
-	if w.IsConnected() {
-		if err := w.Shutdown(); err != nil {
-			log.Errorln(log.WebsocketMgr, err)
-		}
-	}
 
 	w.setEnabled(false)
 	return nil
@@ -366,16 +361,28 @@ func (w *Websocket) dataMonitor() {
 
 // connectionMonitor ensures that the WS keeps connecting
 func (w *Websocket) connectionMonitor() {
-	w.Wg.Add(1)
 	delay := w.connectionMonitorDelay
 	timer := time.NewTimer(delay)
 	for {
 		if w.verbose {
 			log.Debugf(log.WebsocketMgr, "%v websocket: running connection monitor cycle", w.exchangeName)
 		}
-		select {
-		case <-w.ShutdownC:
+		if !w.IsEnabled() {
+			if w.verbose {
+				log.Debugf(log.WebsocketMgr, "%v websocket: connectionMonitor - websocket disabled, shutting down", w.exchangeName)
+			}
+			if w.IsConnected() {
+				if err := w.Shutdown(); err != nil {
+					log.Errorln(log.WebsocketMgr, err)
+				}
+			}
+			if w.verbose {
+				log.Debugf(log.WebsocketMgr, "%v websocket: connection monitor exiting", w.exchangeName)
+			}
+			timer.Stop()
 			return
+		}
+		select {
 		case err := <-w.ReadMessageErrors:
 			w.DataHandler <- err
 			if IsDisconnectionError(err) {
@@ -396,7 +403,6 @@ func (w *Websocket) connectionMonitor() {
 			timer.Reset(delay)
 		}
 	}
-	w.Wg.Done()
 }
 
 // Shutdown attempts to shut down a websocket connection and associated routines
