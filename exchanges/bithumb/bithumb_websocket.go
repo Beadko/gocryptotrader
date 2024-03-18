@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
@@ -208,28 +207,29 @@ func channelName(name string) string {
 
 // Subscribe subscribes to a set of channels
 func (b *Bithumb) Subscribe(chans subscription.List) error {
-	return b.ParallelChanOp(chans, b.subscribeToChan, 1)
-
+	return b.ParallelChanOp(chans, b.subscribeToChan, 50)
 }
 
 func (b *Bithumb) subscribeToChan(chans subscription.List) error {
-
-	var errs error
 	for _, s := range chans {
 		req := &WsSubscribe{
 			Type:    s.Channel,
 			Symbols: s.Pairs,
 		}
-		if s.Channel == "ticker" {
+		if s.Channel == tickerChannel {
 			req.TickTypes = wsDefaultTickTypes
 		}
-		err := b.Websocket.Conn.SendJSONMessage(req)
+		err := s.SetState(subscription.SubscribingState)
 		if err == nil {
-			err = b.Websocket.AddSuccessfulSubscriptions(s)
+			err = b.Websocket.AddSubscriptions(s)
 		}
 		if err != nil {
-			errs = common.AppendError(errs, err)
+			return fmt.Errorf("%w Channel: %s Pair: %s Error: %w", stream.ErrSubscriptionFailure, s.Channel, s.Pairs, err)
+		}
+		err = b.Websocket.Conn.SendJSONMessage(req)
+		if err != nil {
+			return err
 		}
 	}
-	return errs
+	return nil
 }
