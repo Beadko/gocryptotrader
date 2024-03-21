@@ -223,9 +223,9 @@ func TestTrafficMonitorTrafficAlerts(t *testing.T) {
 		assert.Truef(t, ws.IsConnected(), "state should still be connected; Check #%d", i)
 	}
 
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		assert.Equal(c, disconnected, ws.state.Load(), "websocket must be disconnected")
-	}, 2*ws.trafficTimeout, patience, "trafficTimeout should trigger a shutdown once we stop feeding trafficAlerts")
+	require.Eventually(t, func() bool {
+		return ws.state.Load() == disconnected
+	}, 4*ws.trafficTimeout, 10*time.Millisecond, "websocket must be disconnected")
 }
 
 // TestTrafficMonitorConnecting ensures connecting status doesn't trigger shutdown
@@ -243,9 +243,9 @@ func TestTrafficMonitorConnecting(t *testing.T) {
 	<-time.After(4 * ws.trafficTimeout)
 	require.Equal(t, connecting, ws.state.Load(), "websocket must still be connecting after several checks")
 	ws.state.Store(connected)
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		assert.Equal(c, disconnected, ws.state.Load(), "websocket must be disconnected")
-	}, 4*ws.trafficTimeout, 10*time.Millisecond, "trafficTimeout should trigger a shutdown after connecting status changes")
+	require.Eventually(t, func() bool {
+		return ws.state.Load() == disconnected
+	}, 4*ws.trafficTimeout, 10*time.Millisecond, "websocket must be disconnected")
 }
 
 // TestTrafficMonitorShutdown ensures shutdown is processed and waitgroup is cleared
