@@ -184,11 +184,6 @@ func (b *Bithumb) GenerateSubscriptions() (subscription.List, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	/*pFmt, err := b.GetPairFormat(asset.Spot, true)
-	if err != nil {
-		return nil, err
-	}*/
 	for _, baseSub := range b.Features.Subscriptions {
 		baseSub.Channel = channelName(baseSub.Channel)
 		s := baseSub.Clone()

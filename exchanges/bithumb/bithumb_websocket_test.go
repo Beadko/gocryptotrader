@@ -121,7 +121,7 @@ func TestSubscribe(t *testing.T) {
 	require.NoError(t, testexch.TestInstance(b), "TestInstance must not error")
 	testexch.SetupWs(t, b)
 	err := b.Subscribe(subscription.List{
-		{Channel: subscription.TickerChannel, Pairs: currency.Pairs{testPairMapping}},
+		{Channel: "private", Pairs: currency.Pairs{testPairMapping}},
 		{Channel: subscription.OrderbookChannel, Pairs: currency.Pairs{testPairMapping}},
 	},
 	)
