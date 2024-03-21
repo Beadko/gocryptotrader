@@ -566,7 +566,11 @@ func TestConnectionMonitor(t *testing.T) {
 	ws.setEnabled(true)
 	go ws.connectionMonitor()
 	require.Eventually(t, func() bool {
-		return ws.connectionMonitorRunning.Load()
+		return true
+	}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must be running")
+	ws.setEnabled(false)
+	require.Eventually(t, func() bool {
+		return false
 	}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must be running")
 }
 
