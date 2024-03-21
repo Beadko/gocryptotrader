@@ -566,12 +566,12 @@ func TestConnectionMonitor(t *testing.T) {
 	ws.setEnabled(true)
 	go ws.connectionMonitor()
 	require.Eventually(t, func() bool {
-		return true
+		return ws.state.Load() == connected
 	}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must be running")
 	ws.setEnabled(false)
 	require.Eventually(t, func() bool {
-		return false
-	}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must be running")
+		return ws.state.Load() == disconnected
+	}, 5*time.Second, 10*time.Millisecond, "ConnectionMonitor must shut down")
 }
 
 // TestGetSubscription logic test

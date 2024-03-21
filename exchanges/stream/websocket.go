@@ -290,8 +290,9 @@ func (w *Websocket) Connect() error {
 		return fmt.Errorf("%v Error connecting %w", w.exchangeName, err)
 	}
 	w.setState(connected)
-
-	go w.connectionMonitor()
+	if !w.connectionMonitorRunning.CompareAndSwap(false, true) {
+		go w.connectionMonitor()
+	}
 
 	subs, err := w.GenerateSubs() // regenerate state on new connection
 	if err != nil {
@@ -361,9 +362,6 @@ func (w *Websocket) dataMonitor() {
 
 // connectionMonitor ensures that the WS keeps connecting
 func (w *Websocket) connectionMonitor() {
-	if !w.connectionMonitorRunning.CompareAndSwap(false, true) {
-		return
-	}
 	delay := w.connectionMonitorDelay
 	timer := time.NewTimer(delay)
 	for {
@@ -555,8 +553,7 @@ func (w *Websocket) trafficMonitor() {
 			}
 			w.Wg.Done() // Without this the w.Shutdown() call below will deadlock
 			if w.IsConnected() {
-				err := w.Shutdown()
-				if err != nil {
+				if err := w.Shutdown(); err != nil {
 					log.Errorf(log.WebsocketMgr, "%v websocket: trafficMonitor shutdown err: %s", w.exchangeName, err)
 				}
 			}
