@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
@@ -206,6 +208,7 @@ func (b *Bithumb) Subscribe(chans subscription.List) error {
 }
 
 func (b *Bithumb) subscribeToChan(chans subscription.List) error {
+	cNames := make([]string, len(chans))
 	for _, s := range chans {
 		req := &WsSubscribe{
 			Type:    s.Channel,
@@ -223,7 +226,15 @@ func (b *Bithumb) subscribeToChan(chans subscription.List) error {
 		}
 		err = b.Websocket.Conn.SendJSONMessage(req)
 		if err != nil {
-			return err
+			_ = b.Websocket.RemoveSubscriptions(chans...)
+			err = fmt.Errorf("%w: %w; Channels: %s", stream.ErrSubscriptionFailure, err, strings.Join(cNames, ", "))
+			b.Websocket.DataHandler <- err
+		} else {
+			for _, s := range chans {
+				if sErr := s.SetState(subscription.SubscribedState); sErr != nil {
+					err = common.AppendError(err, sErr)
+				}
+			}
 		}
 	}
 	return nil

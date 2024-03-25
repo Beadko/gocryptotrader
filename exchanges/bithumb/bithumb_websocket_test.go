@@ -52,7 +52,7 @@ func TestWsHandleData(t *testing.T) {
 				},
 			},
 			Websocket: &stream.Websocket{
-				Wg:          *new(sync.WaitGroup),
+				Wg:          sync.WaitGroup{},
 				DataHandler: make(chan interface{}, 1),
 			},
 		},
@@ -121,7 +121,7 @@ func TestSubscribe(t *testing.T) {
 	require.NoError(t, testexch.TestInstance(b), "TestInstance must not error")
 	testexch.SetupWs(t, b)
 	err := b.Subscribe(subscription.List{
-		{Channel: "private", Pairs: currency.Pairs{testPairMapping}},
+		{Channel: "keikochannel", Pairs: currency.Pairs{testPairMapping}},
 		{Channel: subscription.OrderbookChannel, Pairs: currency.Pairs{testPairMapping}},
 	},
 	)
