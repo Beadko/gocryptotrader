@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -91,12 +90,11 @@ func (b *Bithumb) wsHandleData(respRaw []byte) error {
 	}
 
 	if resp.Status != "" {
-		if resp.Status == "0000" {
-			return nil
+		// Anything with a status is a subscription response
+		if !b.Websocket.Match.IncomingWithData("subscription", respRaw) {
+			return fmt.Errorf("subscription response listener not found for message: %s", respRaw)
 		}
-		return fmt.Errorf("%s: %w",
-			resp.ResponseMessage,
-			stream.ErrSubscriptionFailure)
+		return nil
 	}
 
 	switch resp.Type {
@@ -187,7 +185,6 @@ func (b *Bithumb) GenerateSubscriptions() (subscription.List, error) {
 		return nil, err
 	}
 	for _, baseSub := range b.Features.Subscriptions {
-		baseSub.Channel = channelName(baseSub.Channel)
 		s := baseSub.Clone()
 		s.Pairs = pairs
 		subscriptions = append(subscriptions, s)
@@ -203,39 +200,34 @@ func channelName(name string) string {
 }
 
 // Subscribe subscribes to a set of channels
-func (b *Bithumb) Subscribe(chans subscription.List) error {
-	return b.ParallelChanOp(chans, b.subscribeToChan, 50)
-}
-
-func (b *Bithumb) subscribeToChan(chans subscription.List) error {
-	cNames := make([]string, len(chans))
-	for _, s := range chans {
+// Since bithumb doesn't provide any link at all between messages, we have to wait for each response before the next subscription hence we don't use ParallelChanOp
+func (b *Bithumb) Subscribe(subs subscription.List) error {
+	b.subMutex.Lock()
+	defer b.subMutex.Unlock()
+	var errs error
+	for _, s := range subs {
 		req := &WsSubscribe{
-			Type:    s.Channel,
+			Type:    channelName(s.Channel),
 			Symbols: s.Pairs,
 		}
-		if s.Channel == tickerChannel {
+		if req.Type == tickerChannel {
+			// TODO: This needs to come from s.Interval
 			req.TickTypes = wsDefaultTickTypes
 		}
-		err := s.SetState(subscription.SubscribingState)
+		resp, err := b.Websocket.Conn.SendMessageReturnResponse("subscription", req)
 		if err == nil {
-			err = b.Websocket.AddSubscriptions(s)
+			// Use jsonparser to get at the field status, and if it's not 0000 then add the status and resmsg as an error for below
+			_ = resp
 		}
+
 		if err != nil {
-			return fmt.Errorf("%w Channel: %s Pair: %s Error: %w", stream.ErrSubscriptionFailure, s.Channel, s.Pairs, err)
-		}
-		err = b.Websocket.Conn.SendJSONMessage(req)
-		if err != nil {
-			_ = b.Websocket.RemoveSubscriptions(chans...)
-			err = fmt.Errorf("%w: %w; Channels: %s", stream.ErrSubscriptionFailure, err, strings.Join(cNames, ", "))
+			err = fmt.Errorf("%w: %w; Channel: %s", stream.ErrSubscriptionFailure, err, s.Channel)
 			b.Websocket.DataHandler <- err
 		} else {
-			for _, s := range chans {
-				if sErr := s.SetState(subscription.SubscribedState); sErr != nil {
-					err = common.AppendError(err, sErr)
-				}
+			if err := b.Websocket.AddSuccessfulSubscriptions(s); err != nil {
+				errs = common.AppendError(errs, err)
 			}
 		}
 	}
-	return nil
+	return errs
 }

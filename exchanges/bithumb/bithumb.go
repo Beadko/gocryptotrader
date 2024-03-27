@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/thrasher-corp/gocryptotrader/common"
@@ -55,7 +56,8 @@ var errSymbolIsEmpty = errors.New("symbol cannot be empty")
 // Bithumb is the overarching type across the Bithumb package
 type Bithumb struct {
 	exchange.Base
-	obm orderbookManager
+	obm      orderbookManager
+	subMutex sync.Mutex
 }
 
 // GetTradablePairs returns a list of tradable currencies
