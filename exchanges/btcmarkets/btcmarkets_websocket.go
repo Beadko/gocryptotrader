@@ -325,26 +325,24 @@ func (b *BTCMarkets) wsHandleData(respRaw []byte) error {
 	return nil
 }
 
-func (b *BTCMarkets) generateDefaultSubscriptions() ([]subscription.Subscription, error) {
+func (b *BTCMarkets) generateDefaultSubscriptions() (subscription.List, error) {
 	var channels = []string{wsOB, tick, tradeEndPoint}
 	enabledCurrencies, err := b.GetEnabledPairs(asset.Spot)
 	if err != nil {
 		return nil, err
 	}
-	var subscriptions []subscription.Subscription
+	var subscriptions subscription.List
 	for i := range channels {
-		for j := range enabledCurrencies {
-			subscriptions = append(subscriptions, subscription.Subscription{
-				Channel: channels[i],
-				Pair:    enabledCurrencies[j],
-				Asset:   asset.Spot,
-			})
-		}
+		subscriptions = append(subscriptions, &subscription.Subscription{
+			Channel: channels[i],
+			Pairs:   enabledCurrencies,
+			Asset:   asset.Spot,
+		})
 	}
 
 	if b.Websocket.CanUseAuthenticatedEndpoints() {
 		for i := range authChannels {
-			subscriptions = append(subscriptions, subscription.Subscription{
+			subscriptions = append(subscriptions, &subscription.Subscription{
 				Channel: authChannels[i],
 			})
 		}
@@ -353,31 +351,21 @@ func (b *BTCMarkets) generateDefaultSubscriptions() ([]subscription.Subscription
 }
 
 // Subscribe sends a websocket message to receive data from the channel
-func (b *BTCMarkets) Subscribe(subs []subscription.Subscription) error {
-	var payload WsSubscribe
-	if len(subs) > 1 {
-		// TODO: Expand this to stream package as this assumes that we are doing
-		// an initial sync.
-		payload.MessageType = subscribe
-	} else {
-		payload.MessageType = addSubscription
-		payload.ClientType = clientType
+func (b *BTCMarkets) Subscribe(subs subscription.List) error {
+	baseReq := WsSubscribe{
+		MessageType: subscribe,
+	}
+	if len(b.Websocket.GetSubscriptions()) != 0 {
+		baseReq.MessageType = addSubscription
+		baseReq.ClientType = clientType
 	}
 
 	var authenticate bool
-	for i := range subs {
-		if !authenticate && common.StringDataContains(authChannels, subs[i].Channel) {
+	for _, s := range subs {
+		if common.StringDataContains(authChannels, s.Channel) {
 			authenticate = true
+			break
 		}
-		payload.Channels = append(payload.Channels, subs[i].Channel)
-		if subs[i].Pair.IsEmpty() {
-			continue
-		}
-		pair := subs[i].Pair.String()
-		if common.StringDataCompare(payload.MarketIDs, pair) {
-			continue
-		}
-		payload.MarketIDs = append(payload.MarketIDs, pair)
 	}
 
 	if authenticate {
@@ -388,58 +376,68 @@ func (b *BTCMarkets) Subscribe(subs []subscription.Subscription) error {
 		signTime := strconv.FormatInt(time.Now().UnixMilli(), 10)
 		strToSign := "/users/self/subscribe" + "\n" + signTime
 		var tempSign []byte
-		tempSign, err = crypto.GetHMAC(crypto.HashSHA512,
-			[]byte(strToSign),
-			[]byte(creds.Secret))
+		tempSign, err = crypto.GetHMAC(crypto.HashSHA512, []byte(strToSign), []byte(creds.Secret))
 		if err != nil {
 			return err
 		}
 		sign := crypto.Base64Encode(tempSign)
-		payload.Key = creds.Key
-		payload.Signature = sign
-		payload.Timestamp = signTime
+		baseReq.Key = creds.Key
+		baseReq.Signature = sign
+		baseReq.Timestamp = signTime
 	}
 
-	if err := b.Websocket.Conn.SendJSONMessage(payload); err != nil {
-		return err
+	var errs error
+	for i, s := range subs {
+		if i == 1 {
+			baseReq.MessageType = addSubscription
+			baseReq.ClientType = clientType
+		}
+
+		req := baseReq
+
+		req.Channels = []string{s.Channel}
+		req.MarketIDs = s.Pairs.Strings()
+
+		err := b.Websocket.Conn.SendJSONMessage(req)
+		if err == nil {
+			err = b.Websocket.AddSuccessfulSubscriptions(s)
+		}
+		if err != nil {
+			errs = common.AppendError(errs, err)
+		}
 	}
-	b.Websocket.AddSuccessfulSubscriptions(subs...)
-	return nil
+
+	return errs
 }
 
 // Unsubscribe sends a websocket message to manage and remove a subscription.
-func (b *BTCMarkets) Unsubscribe(subs []subscription.Subscription) error {
-	payload := WsSubscribe{
-		MessageType: removeSubscription,
-		ClientType:  clientType,
-	}
-	for i := range subs {
-		payload.Channels = append(payload.Channels, subs[i].Channel)
-		if subs[i].Pair.IsEmpty() {
-			continue
+func (b *BTCMarkets) Unsubscribe(subs subscription.List) error {
+	var errs error
+	for _, s := range subs {
+		req := WsSubscribe{
+			MessageType: removeSubscription,
+			ClientType:  clientType,
+			Channels:    []string{s.Channel},
+			MarketIDs:   s.Pairs.Strings(),
 		}
 
-		pair := subs[i].Pair.String()
-		if common.StringDataCompare(payload.MarketIDs, pair) {
-			continue
+		err := b.Websocket.Conn.SendJSONMessage(req)
+		if err == nil {
+			err = b.Websocket.RemoveSubscriptions(s)
 		}
-		payload.MarketIDs = append(payload.MarketIDs, pair)
+		if err != nil {
+			errs = common.AppendError(errs, err)
+		}
 	}
-
-	err := b.Websocket.Conn.SendJSONMessage(payload)
-	if err != nil {
-		return err
-	}
-	b.Websocket.RemoveSubscriptions(subs...)
-	return nil
+	return errs
 }
 
 // ReSubscribeSpecificOrderbook removes the subscription and the subscribes
 // again to fetch a new snapshot in the event of a de-sync event.
 func (b *BTCMarkets) ReSubscribeSpecificOrderbook(pair currency.Pair) error {
-	sub := []subscription.Subscription{{
+	sub := subscription.List{{
 		Channel: wsOB,
-		Pair:    pair,
+		Pairs:   currency.Pairs{pair},
 		Asset:   asset.Spot,
 	}}
 	if err := b.Unsubscribe(sub); err != nil {

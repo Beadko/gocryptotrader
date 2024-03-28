@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/asset"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/kline"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/ticker"
@@ -20,9 +22,19 @@ const (
 	tradeTimeLayout  = time.DateTime + ".000000"
 )
 
+const (
+	// public channels
+	tickerChannel    = "ticker"
+	orderbookChannel = "orderbook"
+)
+
+var subscriptionNames = map[string]string{
+	subscription.TickerChannel:    tickerChannel,
+	subscription.OrderbookChannel: orderbookChannel,
+	// No equivalents for:CandlesChannel, AllTradesChannel, MyOrdersChannel, AllOrders, MyTrades
+}
 var (
-	wsDefaultTickTypes = []string{"30M"} // alternatives "1H", "12H", "24H", "MID"
-	location           *time.Location
+	location *time.Location
 )
 
 // WsConnect initiates a websocket connection
@@ -78,12 +90,11 @@ func (b *Bithumb) wsHandleData(respRaw []byte) error {
 	}
 
 	if resp.Status != "" {
-		if resp.Status == "0000" {
-			return nil
+		// Anything with a status is a subscription response
+		if !b.Websocket.Match.IncomingWithData("subscription", respRaw) {
+			return fmt.Errorf("subscription response listener not found for message: %s", respRaw)
 		}
-		return fmt.Errorf("%s: %w",
-			resp.ResponseMessage,
-			stream.ErrSubscriptionFailure)
+		return nil
 	}
 
 	switch resp.Type {
@@ -167,56 +178,81 @@ func (b *Bithumb) wsHandleData(respRaw []byte) error {
 }
 
 // GenerateSubscriptions generates the default subscription set
-func (b *Bithumb) GenerateSubscriptions() ([]subscription.Subscription, error) {
-	var channels = []string{"ticker", "transaction", "orderbookdepth"}
-	var subscriptions []subscription.Subscription
+func (b *Bithumb) GenerateSubscriptions() (subscription.List, error) {
+	var subscriptions subscription.List
 	pairs, err := b.GetEnabledPairs(asset.Spot)
 	if err != nil {
 		return nil, err
 	}
-
-	pFmt, err := b.GetPairFormat(asset.Spot, true)
-	if err != nil {
-		return nil, err
-	}
-
-	for x := range pairs {
-		for y := range channels {
-			subscriptions = append(subscriptions, subscription.Subscription{
-				Channel: channels[y],
-				Pair:    pairs[x].Format(pFmt),
-				Asset:   asset.Spot,
-			})
-		}
+	for _, baseSub := range b.Features.Subscriptions {
+		s := baseSub.Clone()
+		s.Pairs = pairs
+		subscriptions = append(subscriptions, s)
 	}
 	return subscriptions, nil
 }
 
 // Subscribe subscribes to a set of channels
-func (b *Bithumb) Subscribe(channelsToSubscribe []subscription.Subscription) error {
-	subs := make(map[string]*WsSubscribe)
-	for i := range channelsToSubscribe {
-		s, ok := subs[channelsToSubscribe[i].Channel]
-		if !ok {
-			s = &WsSubscribe{
-				Type: channelsToSubscribe[i].Channel,
-			}
-			subs[channelsToSubscribe[i].Channel] = s
-		}
-		s.Symbols = append(s.Symbols, channelsToSubscribe[i].Pair)
-	}
-
-	tSub, ok := subs["ticker"]
-	if ok {
-		tSub.TickTypes = wsDefaultTickTypes
-	}
-
+// Since bithumb doesn't provide any link at all between messages, we have to wait for each response before the next subscription hence we don't use ParallelChanOp
+func (b *Bithumb) Subscribe(subs subscription.List) error {
+	b.subMutex.Lock()
+	defer b.subMutex.Unlock()
+	var errs error
 	for _, s := range subs {
-		err := b.Websocket.Conn.SendJSONMessage(s)
-		if err != nil {
-			return err
+		req := &WsSubscribe{
+			Type:    channelName(s.Channel),
+			Symbols: s.Pairs,
+		}
+		if req.Type == tickerChannel {
+			interval, err := b.intervalToString(s.Interval)
+			if err != nil {
+				errs = common.AppendError(errs, err)
+				continue
+			}
+			req.TickTypes = []string{interval}
+		}
+		respRaw, err := b.Websocket.Conn.SendMessageReturnResponse("subscription", req)
+		if err == nil {
+			var resp WsResponse
+			if err = json.Unmarshal(respRaw, &resp); err == nil {
+				if resp.Status != "0000" {
+					err = fmt.Errorf("%s (%s)", resp.ResponseMessage, resp.Status)
+				}
+			}
+		}
+		if err == nil {
+			if err = b.Websocket.AddSuccessfulSubscriptions(s); err != nil {
+				errs = common.AppendError(errs, err)
+			}
+		} else {
+			err = fmt.Errorf("%w: %w; Channels: %s", stream.ErrSubscriptionFailure, err, s.Channel)
+			b.Websocket.DataHandler <- err
+			errs = common.AppendError(errs, err)
 		}
 	}
-	b.Websocket.AddSuccessfulSubscriptions(channelsToSubscribe...)
-	return nil
+	return errs
+}
+
+func channelName(name string) string {
+	if s, ok := subscriptionNames[name]; ok {
+		return s
+	}
+	return name
+}
+
+func (b *Bithumb) intervalToString(interval kline.Interval) (string, error) {
+
+	return "1M", nil
+	switch interval {
+	case kline.ThirtyMin:
+		return "30M", nil
+	case kline.OneHour:
+		return "1H", nil
+	case kline.TwelveHour:
+		return "12H", nil
+	case kline.OneDay:
+		return "24H", nil
+	default:
+		return "", kline.ErrUnsupportedInterval
+	}
 }

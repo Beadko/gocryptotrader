@@ -466,15 +466,15 @@ func (h *HitBTC) WsProcessOrderbookUpdate(update *WsOrderbook) error {
 }
 
 // GenerateDefaultSubscriptions Adds default subscriptions to websocket to be handled by ManageSubscriptions()
-func (h *HitBTC) GenerateDefaultSubscriptions() ([]subscription.Subscription, error) {
+func (h *HitBTC) GenerateDefaultSubscriptions() (subscription.List, error) {
 	var channels = []string{"subscribeTicker",
 		"subscribeOrderbook",
 		"subscribeTrades",
 		"subscribeCandles"}
 
-	var subscriptions []subscription.Subscription
+	var subscriptions subscription.List
 	if h.Websocket.CanUseAuthenticatedEndpoints() {
-		subscriptions = append(subscriptions, subscription.Subscription{
+		subscriptions = append(subscriptions, &subscription.Subscription{
 			Channel: "subscribeReports",
 		})
 	}
@@ -490,9 +490,9 @@ func (h *HitBTC) GenerateDefaultSubscriptions() ([]subscription.Subscription, er
 			}
 
 			enabledCurrencies[j].Delimiter = ""
-			subscriptions = append(subscriptions, subscription.Subscription{
+			subscriptions = append(subscriptions, &subscription.Subscription{
 				Channel: channels[i],
-				Pair:    fPair,
+				Pairs:   currency.Pairs{fPair},
 				Asset:   asset.Spot,
 			})
 		}
@@ -501,7 +501,7 @@ func (h *HitBTC) GenerateDefaultSubscriptions() ([]subscription.Subscription, er
 }
 
 // Subscribe sends a websocket message to receive data from the channel
-func (h *HitBTC) Subscribe(channelsToSubscribe []subscription.Subscription) error {
+func (h *HitBTC) Subscribe(channelsToSubscribe subscription.List) error {
 	var errs error
 	for i := range channelsToSubscribe {
 		subscribe := WsRequest{
@@ -509,8 +509,8 @@ func (h *HitBTC) Subscribe(channelsToSubscribe []subscription.Subscription) erro
 			ID:     h.Websocket.Conn.GenerateMessageID(false),
 		}
 
-		if channelsToSubscribe[i].Pair.String() != "" {
-			subscribe.Params.Symbol = channelsToSubscribe[i].Pair.String()
+		if channelsToSubscribe[i].Pairs.String() != "" {
+			subscribe.Params.Symbol = channelsToSubscribe[i].Pairs.String()
 		}
 		if strings.EqualFold(channelsToSubscribe[i].Channel, "subscribeTrades") {
 			subscribe.Params.Limit = 100
@@ -520,20 +520,18 @@ func (h *HitBTC) Subscribe(channelsToSubscribe []subscription.Subscription) erro
 		}
 
 		err := h.Websocket.Conn.SendJSONMessage(subscribe)
+		if err == nil {
+			err = h.Websocket.AddSuccessfulSubscriptions(channelsToSubscribe[i])
+		}
 		if err != nil {
 			errs = common.AppendError(errs, err)
-			continue
 		}
-		h.Websocket.AddSuccessfulSubscriptions(channelsToSubscribe[i])
 	}
-	if errs != nil {
-		return errs
-	}
-	return nil
+	return errs
 }
 
 // Unsubscribe sends a websocket message to stop receiving data from the channel
-func (h *HitBTC) Unsubscribe(channelsToUnsubscribe []subscription.Subscription) error {
+func (h *HitBTC) Unsubscribe(channelsToUnsubscribe subscription.List) error {
 	var errs error
 	for i := range channelsToUnsubscribe {
 		unsubscribeChannel := strings.Replace(channelsToUnsubscribe[i].Channel,
@@ -546,7 +544,7 @@ func (h *HitBTC) Unsubscribe(channelsToUnsubscribe []subscription.Subscription) 
 			Method:         unsubscribeChannel,
 		}
 
-		unsubscribe.Params.Symbol = channelsToUnsubscribe[i].Pair.String()
+		unsubscribe.Params.Symbol = channelsToUnsubscribe[i].Pairs.String()
 		if strings.EqualFold(unsubscribeChannel, "unsubscribeTrades") {
 			unsubscribe.Params.Limit = 100
 		} else if strings.EqualFold(unsubscribeChannel, "unsubscribeCandles") {
@@ -555,16 +553,14 @@ func (h *HitBTC) Unsubscribe(channelsToUnsubscribe []subscription.Subscription) 
 		}
 
 		err := h.Websocket.Conn.SendJSONMessage(unsubscribe)
+		if err == nil {
+			err = h.Websocket.RemoveSubscriptions(channelsToUnsubscribe[i])
+		}
 		if err != nil {
 			errs = common.AppendError(errs, err)
-			continue
 		}
-		h.Websocket.RemoveSubscriptions(channelsToUnsubscribe[i])
 	}
-	if errs != nil {
-		return errs
-	}
-	return nil
+	return errs
 }
 
 // Unsubscribe sends a websocket message to stop receiving data from the channel
