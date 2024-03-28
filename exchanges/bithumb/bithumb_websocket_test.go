@@ -21,7 +21,7 @@ var (
 	wsTransResp     = []byte(`{"type":"transaction","content":{"list":[{"buySellGb":"1","contPrice":"1166","contQty":"125.2400","contAmt":"146029.8400","contDtm":"2021-08-13 15:23:42.911273","updn":"dn","symbol":"DAI_KRW"}]}}`)
 	wsOrderbookResp = []byte(`{"type":"orderbookdepth","content":{"list":[{"symbol":"XLM_KRW","orderType":"ask","price":"401.2","quantity":"0","total":"0"},{"symbol":"XLM_KRW","orderType":"ask","price":"401.6","quantity":"21277.735","total":"1"},{"symbol":"XLM_KRW","orderType":"ask","price":"403.3","quantity":"4000","total":"1"},{"symbol":"XLM_KRW","orderType":"bid","price":"399.5","quantity":"0","total":"0"},{"symbol":"XLM_KRW","orderType":"bid","price":"398.2","quantity":"0","total":"0"},{"symbol":"XLM_KRW","orderType":"bid","price":"399.8","quantity":"31416.8779","total":"1"},{"symbol":"XLM_KRW","orderType":"bid","price":"398.5","quantity":"34328.387","total":"1"}],"datetime":"1628835823604483"}}`)
 	// this pair is used to ensure that endpoints match it correctly
-	testPairMapping = currency.NewPair(currency.BTC, currency.USDT)
+	testPairMapping = currency.NewPair(currency.BTC, currency.KRW)
 )
 
 func TestWsHandleData(t *testing.T) {
@@ -29,7 +29,7 @@ func TestWsHandleData(t *testing.T) {
 	pairs := currency.Pairs{
 		currency.Pair{
 			Base:  currency.BTC,
-			Quote: currency.USDT,
+			Quote: currency.KRW,
 		},
 	}
 
@@ -121,9 +121,14 @@ func TestSubscribe(t *testing.T) {
 	require.NoError(t, testexch.TestInstance(b), "TestInstance must not error")
 	testexch.SetupWs(t, b)
 	err := b.Subscribe(subscription.List{
-		{Channel: "keikochannel", Pairs: currency.Pairs{testPairMapping}},
 		{Channel: subscription.OrderbookChannel, Pairs: currency.Pairs{testPairMapping}},
 	},
 	)
 	require.NoError(t, err, "Subscribe must not error")
+
+	err = b.Subscribe(subscription.List{
+		{Channel: "keikochannel", Pairs: currency.Pairs{testPairMapping}},
+	},
+	)
+	require.ErrorIs(t, err, stream.ErrSubscriptionFailure, "Subscribe should error")
 }
