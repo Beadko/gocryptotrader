@@ -2039,7 +2039,7 @@ func TestGetLiquidationFeed(t *testing.T) {
 		assert.NotEmpty(t, l.Amount, "amount should not be empty")
 		assert.NotEmpty(t, l.MTS, "millisecond epoch timestamp should not be empty")
 		assert.NotEmpty(t, l.Pair, "pair should not be empty")
-		assert.NotEmpty(t, l.BasePrice, "base price shoul not be empty")
+		assert.NotEmpty(t, l.BasePrice, "base price should not be empty")
 		assert.True(t, l.IsMatch == 0 || l.IsMatch == 1, "isMatch should be either 0 or 1")
 		assert.True(t, l.IsMarketSold == 0 || l.IsMarketSold == 1, "isMarketSold should be either 0 or 1")
 	}
