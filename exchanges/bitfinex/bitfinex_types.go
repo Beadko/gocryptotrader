@@ -527,6 +527,18 @@ type LeaderboardEntry struct {
 	TwitterHandle string
 }
 
+// Liquidations holds liquidation data
+type Liquidations struct {
+	PositionID    int
+	MTS           int // millisecond epoch timestamp
+	Pair          string
+	Amount        float64
+	BasePrice     float64
+	IsMatch       int // 0: initial liquidation trigger | 1: market execution
+	IsMarketSold  int //0: position acquired by the system | 1: direct sell into the market
+	PriceAcquired float64
+}
+
 // WebsocketTicker holds ticker information
 type WebsocketTicker struct {
 	Bid             float64

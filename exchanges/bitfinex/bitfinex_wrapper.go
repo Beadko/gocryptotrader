@@ -1176,6 +1176,41 @@ func (b *Bitfinex) GetHistoricCandlesExtended(ctx context.Context, pair currency
 	return req.ProcessResponse(timeSeries)
 }
 
+// GetLiquidations returns an array of liquidations between a time period for a set time interval
+func (b *Bitfinex) GetLiquidations(ctx context.Context, sort, limit int, start, end time.Time) ([]exchange.Liquidations, error) {
+	res, err := b.GetLiquidationFeed(ctx, sort, limit, start, end)
+	if err != nil {
+		return nil, err
+	}
+
+	liq := make([]exchange.Liquidations, len(res))
+
+	for i, r := range res {
+		var p currency.Pair
+		p, err = currency.NewPairFromString(r.Pair)
+		if err != nil {
+			return nil, err
+		}
+
+		var side order.Side
+		if r.Amount > 0 {
+			side = order.Buy
+		} else {
+			side = order.Sell
+		}
+		liq[i] = exchange.Liquidations{
+			Exchange:  b.Name,
+			Pair:      p,
+			Amount:    r.Amount,
+			Price:     r.PriceAcquired,
+			Side:      side,
+			Timestamp: time.UnixMilli(int64(r.MTS)),
+		}
+	}
+
+	return liq, nil
+}
+
 func (b *Bitfinex) fixCasing(in currency.Pair, a asset.Item) (string, error) {
 	if in.Base.IsEmpty() {
 		return "", currency.ErrCurrencyPairEmpty

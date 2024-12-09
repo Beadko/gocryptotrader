@@ -63,6 +63,7 @@ const (
 	bitfinexLendbook           = "lendbook/"
 	bitfinexLends              = "lends/"
 	bitfinexLeaderboard        = "rankings"
+	bitfinexLiquidations       = "liquidations"
 
 	// Version 2 API endpoints
 	bitfinexAPIVersion2     = "/v2/"
@@ -1113,8 +1114,86 @@ func (b *Bitfinex) GetStatus() error {
 // GetLiquidationFeed returns liquidations. By default it will retrieve the most
 // recent liquidations, but time-specific data can be retrieved using
 // timestamps.
-func (b *Bitfinex) GetLiquidationFeed() error {
-	return common.ErrNotYetImplemented
+func (b *Bitfinex) GetLiquidationFeed(ctx context.Context, sort, limit int, start, end time.Time) ([]Liquidations, error) {
+	path := bitfinexAPIVersion2 + bitfinexLiquidations + "/hist"
+	vals := url.Values{}
+	if sort != 0 {
+		vals.Set("sort", strconv.Itoa(sort))
+	}
+	if limit != 0 {
+		vals.Set("limit", strconv.Itoa(limit))
+	}
+	if !start.IsZero() {
+		vals.Set("start", strconv.FormatInt(start.Unix()*1000, 10))
+	}
+	if !end.IsZero() {
+		vals.Set("end", strconv.FormatInt(start.Unix()*1000, 10))
+	}
+	path = common.EncodeURLValues(path, vals)
+
+	var resp [][][]interface{}
+
+	if err := b.SendHTTPRequest(ctx, exchange.RestSpot, path, &resp, liquid); err != nil {
+		return nil, fmt.Errorf("failed to fetch liquidation data: %w", err)
+	}
+
+	if len(resp) == 0 {
+		return nil, errors.New("no data returned")
+	}
+
+	result := make([]Liquidations, 0, len(resp))
+
+	for x, r := range resp {
+		if len(r[0]) < 12 {
+			return nil, fmt.Errorf("unexpected data format at index %d: expected at least 12 fields, got %d", x, len(r[0]))
+		}
+		pos, ok := r[0][1].(float64)
+		if !ok {
+			return nil, fmt.Errorf("unable to type assert positionID at index %d", x)
+		}
+		mts, ok := r[0][2].(float64)
+		if !ok {
+			return nil, fmt.Errorf("unable to type assert mts at index %d", x)
+		}
+		p, ok := r[0][4].(string)
+		if !ok {
+			return nil, fmt.Errorf("unable to type assert pair at index %d", x)
+		}
+		a, ok := r[0][5].(float64)
+		if !ok {
+			return nil, fmt.Errorf("unable to type assert amount at index %d", x)
+		}
+		bp, ok := r[0][6].(float64)
+		if !ok {
+			return nil, fmt.Errorf("unable to type assert basePrice at index %d", x)
+		}
+		im, ok := r[0][8].(float64)
+		if !ok {
+			return nil, fmt.Errorf("unable to type assert isMatch at index %d", x)
+		}
+		ims, ok := r[0][9].(float64)
+		if !ok {
+			return nil, fmt.Errorf("unable to type assert isMarketSold at index %d", x)
+		}
+		var pa float64
+		if r[0][11] != nil {
+			pa, ok = r[0][11].(float64)
+			if !ok {
+				return nil, fmt.Errorf("unable to type assert priceAcquired at index %d", x)
+			}
+		}
+		result = append(result, Liquidations{
+			PositionID:    int(pos),
+			MTS:           int(mts),
+			Pair:          p,
+			Amount:        a,
+			BasePrice:     bp,
+			IsMatch:       int(im),
+			IsMarketSold:  int(ims),
+			PriceAcquired: pa,
+		})
+	}
+	return result, nil
 }
 
 // GetLeaderboard returns leaderboard standings for unrealized profit (period

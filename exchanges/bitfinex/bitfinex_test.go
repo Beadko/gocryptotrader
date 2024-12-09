@@ -2028,3 +2028,27 @@ func TestGetCurrencyTradeURL(t *testing.T) {
 		assert.NotEmpty(t, resp)
 	}
 }
+
+func TestGetLiquidationFeed(t *testing.T) {
+	t.Parallel()
+
+	liq, err := b.GetLiquidationFeed(context.Background(), 0, 0, time.Time{}, time.Time{})
+	require.NoError(t, err, "getLiquidationFeed must not error")
+	assert.NotEmpty(t, liq, "should return some liquidation entries")
+	for _, l := range liq {
+		assert.NotEmpty(t, l.Amount, "amount should not be empty")
+		assert.NotEmpty(t, l.MTS, "millisecond epoch timestamp should not be empty")
+		assert.NotEmpty(t, l.Pair, "pair should not be empty")
+		assert.NotEmpty(t, l.BasePrice, "base price shoul not be empty")
+		assert.True(t, l.IsMatch == 0 || l.IsMatch == 1, "isMatch should be either 0 or 1")
+		assert.True(t, l.IsMarketSold == 0 || l.IsMarketSold == 1, "isMarketSold should be either 0 or 1")
+	}
+}
+
+func TestGetLiquidations(t *testing.T) {
+	t.Parallel()
+
+	liq, err := b.GetLiquidations(context.Background(), 0, 0, time.Time{}, time.Time{})
+	require.NoError(t, err, "GetLiquidations must not error")
+	assert.NotEmpty(t, liq, "Liquidations should not be empty")
+}

@@ -18,7 +18,7 @@ const (
 	candleReqRate             = 60
 	configsReqRate            = 15
 	statusReqRate             = 15 // This is not specified just inputted WCS
-	liquidReqRate             = 15 // This is not specified just inputted WCS
+	liquidReqRate             = 3
 	leaderBoardReqRate        = 90
 	marketAveragePriceReqRate = 20
 	fxReqRate                 = 20
