@@ -1177,13 +1177,13 @@ func (b *Bitfinex) GetHistoricCandlesExtended(ctx context.Context, pair currency
 }
 
 // GetLiquidations returns an array of liquidations between a time period for a set time interval
-func (b *Bitfinex) GetLiquidations(ctx context.Context, sort, limit int, start, end time.Time) ([]exchange.Liquidations, error) {
+func (b *Bitfinex) GetLiquidations(ctx context.Context, sort, limit int, start, end time.Time) ([]exchange.Liquidation, error) {
 	res, err := b.GetLiquidationFeed(ctx, sort, limit, start, end)
 	if err != nil {
 		return nil, err
 	}
 
-	liq := make([]exchange.Liquidations, len(res))
+	liq := make([]exchange.Liquidation, len(res))
 
 	for i, r := range res {
 		var p currency.Pair
@@ -1198,7 +1198,7 @@ func (b *Bitfinex) GetLiquidations(ctx context.Context, sort, limit int, start, 
 		} else {
 			side = order.Sell
 		}
-		liq[i] = exchange.Liquidations{
+		liq[i] = exchange.Liquidation{
 			Exchange:  b.Name,
 			Pair:      p,
 			Amount:    r.Amount,

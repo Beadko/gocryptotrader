@@ -1948,6 +1948,6 @@ func (b *Base) GetTradingRequirements() protocol.TradingRequirements {
 	return b.Features.TradingRequirements
 }
 
-func (b *Base) GetLiquidations(context.Context, int, int, time.Time, time.Time) ([]Liquidations, error) {
+func (b *Base) GetLiquidations(context.Context, int, int, time.Time, time.Time) ([]Liquidation, error) {
 	return nil, common.ErrNotYetImplemented
 }

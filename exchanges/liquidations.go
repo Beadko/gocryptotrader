@@ -7,7 +7,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 )
 
-type Liquidations struct {
+type Liquidation struct {
 	Exchange  string
 	Pair      currency.Pair
 	Amount    float64
