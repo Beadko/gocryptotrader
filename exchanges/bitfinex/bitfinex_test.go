@@ -2048,7 +2048,26 @@ func TestGetLiquidationFeed(t *testing.T) {
 func TestGetLiquidations(t *testing.T) {
 	t.Parallel()
 
+	b := new(Bitfinex)
+	require.NoError(t, testexch.Setup(b), "Test instance Setup must not error")
+	testexch.UpdatePairsOnce(t, b)
+
+	for _, a := range b.GetAssetTypes(true) {
+		avail, err := b.GetAvailablePairs(a)
+		require.NoError(t, err, "GetAvailablePairs should not error")
+
+		err = b.CurrencyPairs.StorePairs(a, avail, true)
+		require.NoError(t, err, "StorePairs should not error")
+	}
+
 	liq, err := b.GetLiquidations(context.Background(), 0, 0, time.Time{}, time.Time{})
 	require.NoError(t, err, "GetLiquidations must not error")
-	assert.NotEmpty(t, liq, "Liquidations should not be empty")
+	require.NotEmpty(t, liq, "Liquidations must not be empty")
+	/*for _, l := range liq {
+		assert.NotEmpty(t, l.Exchange, "Exchange should not be empty")
+		assert.NotEmpty(t, l.Asset, "Asset should not be empty")
+		assert.NotEmpty(t, l.Pair, "Pair should not be empty")
+		assert.NotEmpty(t, l.Price, "Price should not be empty")
+		assert.NotEmpty(t, l.Side, "Side should not be empty")
+	}*/
 }
