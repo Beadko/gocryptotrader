@@ -895,7 +895,6 @@ func (w *Websocket) SubscribeToChannels(conn Connection, subs subscription.List)
 	if err := w.checkSubscriptions(conn, subs); err != nil {
 		return err
 	}
-
 	if wrapper, ok := w.connections[conn]; ok && conn != nil {
 		return wrapper.Setup.Subscriber(context.TODO(), conn, subs)
 	}
@@ -1089,7 +1088,6 @@ func (w *Websocket) checkSubscriptions(conn Connection, subs subscription.List) 
 			return fmt.Errorf("%w: %s", subscription.ErrDuplicate, s)
 		}
 	}
-
 	return nil
 }
 
