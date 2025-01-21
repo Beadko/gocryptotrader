@@ -255,10 +255,21 @@ func (b *Binance) Setup(exch *config.Exchange) error {
 		return err
 	}
 
-	return b.Websocket.SetupNewConnection(&stream.ConnectionSetup{
+	err = b.Websocket.SetupNewConnection(&stream.ConnectionSetup{
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
 		RateLimit:            request.NewWeightedRateLimitByDuration(250 * time.Millisecond),
+	})
+	if err != nil {
+		return err
+	}
+
+	// USDT margined futures connection
+	return b.Websocket.SetupNewConnection(&stream.ConnectionSetup{
+		URL:                  uFuturesWebsocketURL,
+		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
+		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
+		MessageFilter:        asset.USDTMarginedFutures,
 	})
 }
 
