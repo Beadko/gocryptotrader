@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/buger/jsonparser"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/websocket"
 	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/currency"
@@ -412,6 +413,47 @@ func (b *Binance) wsHandleData(respRaw []byte) error {
 			return fmt.Errorf("%v - UpdateLocalCache error: %s",
 				b.Name,
 				err)
+		}
+		return nil
+	case "forceOrder":
+		var liq LiquidationStream
+		err = json.Unmarshal(jsonData, &liq)
+		if err != nil {
+			return fmt.Errorf("%v - Could not convert to liquidationStream structure %s",
+				b.Name,
+				err)
+		}
+
+		side, err := order.StringToOrderSide(liq.Order.Side)
+		if err != nil {
+			return err
+		}
+		spew.Dump(side)
+
+		orderType, err := order.StringToOrderType(liq.Order.OrderType)
+		if err != nil {
+			return err
+		}
+
+		orderStatus, err := order.StringToOrderStatus(liq.Order.OrderStatus)
+		if err != nil {
+			return err
+		}
+
+		b.Websocket.DataHandler <- stream.LiquidationData{
+			Timestamp:            liq.EventTime,
+			Pair:                 pair,
+			Exchange:             b.Name,
+			Side:                 side,
+			Price:                liq.Order.Price.Float64(),
+			OrderType:            orderType,
+			TimeInForce:          liq.Order.TimeInForce,
+			OriginalQuantity:     liq.Order.OriginalQuantity.Float64(),
+			AveragePrice:         liq.Order.AveragePrice.Float64(),
+			OrderStatus:          orderStatus,
+			LastFilledQty:        liq.Order.LastFilledQty.Float64(),
+			FilledAccumulatedQty: liq.Order.AccumulatedQty.Float64(),
+			TradeTime:            liq.Order.TradeTime,
 		}
 		return nil
 	default:

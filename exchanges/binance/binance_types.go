@@ -257,6 +257,28 @@ type TickerStream struct {
 	NumberOfTrades         int64        `json:"n"`
 }
 
+// LiquidationStream holds the liquidation stream data
+type LiquidationStream struct {
+	EventType string           `json:"e"`
+	EventTime time.Time        `json:"E"`
+	Order     LiquidationOrder `json:"o"`
+}
+
+// LiquidationOrder represents the nested order information in the liquidation event
+type LiquidationOrder struct {
+	Symbol           string       `json:"s"`
+	Side             string       `json:"S"`
+	OrderType        string       `json:"o"`
+	TimeInForce      string       `json:"f"`
+	OriginalQuantity types.Number `json:"q"`
+	Price            types.Number `json:"p"`
+	AveragePrice     types.Number `json:"ap"`
+	OrderStatus      string       `json:"X"`
+	LastFilledQty    types.Number `json:"l"`
+	AccumulatedQty   types.Number `json:"z"`
+	TradeTime        time.Time    `json:"T"`
+}
+
 // HistoricalTrade holds recent trade data
 type HistoricalTrade struct {
 	ID            int64     `json:"id"`

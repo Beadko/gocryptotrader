@@ -27,6 +27,7 @@ import (
 	"github.com/thrasher-corp/gocryptotrader/exchanges/margin"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/order"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/sharedtestvalues"
+	"github.com/thrasher-corp/gocryptotrader/exchanges/stream"
 	"github.com/thrasher-corp/gocryptotrader/exchanges/subscription"
 	testexch "github.com/thrasher-corp/gocryptotrader/internal/testing/exchange"
 	testsubs "github.com/thrasher-corp/gocryptotrader/internal/testing/subscriptions"
@@ -2196,6 +2197,35 @@ func TestWsDepthUpdate(t *testing.T) {
 
 	// reset order book sync status
 	b.obm.state[currency.BTC][currency.USDT][asset.Spot].lastUpdateID = 0
+}
+
+func TestWSLiquidationUpdate(t *testing.T) {
+	t.Parallel()
+
+	b := new(Binance) //nolint:govet // Intentional shadow to avoid future copy/paste mistakes
+	require.NoError(t, testexch.Setup(b), "Test instance Setup must not error")
+	testexch.FixtureToDataHandler(t, "testdata/wsLiquidationData.json", b.wsHandleData)
+	close(b.Websocket.DataHandler)
+
+	expJSON := []string{`{"Timestamp":"2025-01-21 14:48:48.455 +0000 UTC","Pair":"BTCUSDT","Exchange":"Binance","Side":"SELL","OrderType":"LIMIT","TimeInForce":"IOC","OriginalQuantity":0.001,"Price":101440.98,"AveragePrice":101792.60,"OrderStatus":FILLED","LastFilledQty":0.001,"FilledAccumulatedQty":0.001,"TradeTime":" 2025-01-21 14:48:48.451 +0000 UTC"}`}
+	require.Len(t, b.Websocket.DataHandler, len(expJSON), "Must see correct number of liquidations")
+	for resp := range b.Websocket.DataHandler {
+		switch v := resp.(type) {
+		case stream.LiquidationData:
+			i := 0
+			exp := stream.LiquidationData{
+				Exchange: b.Name,
+				Pair:     currency.NewPair(currency.BTC, currency.USDT),
+			}
+			require.NoErrorf(t, json.Unmarshal([]byte(expJSON[i]), &exp), "Must not error unmarshalling json: %s", expJSON)
+			require.Equalf(t, exp, v, "Liquidation [%d] should be correct", i)
+
+		case error:
+			t.Error(v)
+		default:
+			t.Errorf("Unexpected type in DataHandler: %T (%s)", v, v)
+		}
+	}
 }
 
 func TestWsBalanceUpdate(t *testing.T) {
