@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/buger/jsonparser"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/websocket"
 	"github.com/thrasher-corp/gocryptotrader/common"
 	"github.com/thrasher-corp/gocryptotrader/currency"
@@ -416,47 +415,75 @@ func (b *Binance) wsHandleData(respRaw []byte) error {
 				err)
 		}
 		return nil
+	default:
+		return fmt.Errorf("%s %s %s", b.Name, stream.UnhandledMessage, string(respRaw))
+	}
+}
+
+func (b *Binance) wsHandleUFuturesData(respRaw []byte) error {
+	if id, err := jsonparser.GetInt(respRaw, "id"); err == nil {
+		if b.Websocket.Match.IncomingWithData(id, respRaw) {
+			return nil
+		}
+	}
+
+	if resultString, err := jsonparser.GetUnsafeString(respRaw, "result"); err == nil {
+		if resultString == "null" {
+			return nil
+		}
+	}
+
+	event, err := jsonparser.GetUnsafeString(respRaw, "e")
+	if err != nil {
+		return fmt.Errorf("%s %s %s", b.Name, "EventMissing", string(respRaw))
+	}
+
+	symbol, err := jsonparser.GetUnsafeString(respRaw, "o", "s")
+	if err != nil {
+		return err
+	}
+	pair, isEnabled, err := b.MatchSymbolCheckEnabled(symbol, asset.USDTMarginedFutures, false)
+	if err != nil {
+		return err
+	}
+	if !isEnabled {
+		return nil
+	}
+
+	switch event {
 	case "forceOrder":
 		var liq LiquidationStream
-		err = json.Unmarshal(jsonData, &liq)
-		if err != nil {
+		if err := json.Unmarshal(respRaw, &liq); err != nil {
 			return fmt.Errorf("%v - Could not convert to liquidationStream structure %s",
 				b.Name,
 				err)
 		}
 
-		side, err := order.StringToOrderSide(liq.Order.Side)
-		if err != nil {
-			return err
-		}
-		spew.Dump(side)
-
-		orderType, err := order.StringToOrderType(liq.Order.OrderType)
-		if err != nil {
-			return err
-		}
-
-		orderStatus, err := order.StringToOrderStatus(liq.Order.OrderStatus)
-		if err != nil {
-			return err
-		}
-
-		b.Websocket.DataHandler <- stream.LiquidationData{
+		resp := stream.LiquidationData{
 			Timestamp:            liq.EventTime,
 			Pair:                 pair,
 			Exchange:             b.Name,
-			Side:                 side,
 			Price:                liq.Order.Price.Float64(),
-			OrderType:            orderType,
 			TimeInForce:          liq.Order.TimeInForce,
 			OriginalQuantity:     liq.Order.OriginalQuantity.Float64(),
 			AveragePrice:         liq.Order.AveragePrice.Float64(),
-			OrderStatus:          orderStatus,
 			LastFilledQty:        liq.Order.LastFilledQty.Float64(),
 			FilledAccumulatedQty: liq.Order.AccumulatedQty.Float64(),
 			TradeTime:            liq.Order.TradeTime,
 		}
+		if resp.Side, err = order.StringToOrderSide(liq.Order.Side); err != nil {
+			return err
+		}
+		if resp.OrderType, err = order.StringToOrderType(liq.Order.OrderType); err != nil {
+			return err
+		}
+		if resp.OrderStatus, err = order.StringToOrderStatus(liq.Order.OrderStatus); err != nil {
+			return err
+		}
+
+		b.Websocket.DataHandler <- resp
 		return nil
+
 	default:
 		return fmt.Errorf("%s %s %s", b.Name, stream.UnhandledMessage, string(respRaw))
 	}
