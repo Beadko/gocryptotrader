@@ -233,19 +233,18 @@ func (b *Binance) Setup(exch *config.Exchange) error {
 	if err := b.SetupDefaults(exch); err != nil {
 		return err
 	}
-	ePoint, err := b.API.Endpoints.GetURL(exchange.WebsocketSpot)
+	/*ePoint, err := b.API.Endpoints.GetURL(exchange.WebsocketSpot)
 	if err != nil {
 		return err
-	}
-	err = b.Websocket.Setup(&stream.WebsocketSetup{
-		ExchangeConfig:        exch,
-		DefaultURL:            binanceDefaultWebsocketURL,
-		RunningURL:            ePoint,
-		Connector:             b.WsConnect,
-		Subscriber:            b.Subscribe,
-		Unsubscriber:          b.Unsubscribe,
-		GenerateSubscriptions: b.generateSubscriptions,
-		Features:              &b.Features.Supports.WebsocketCapabilities,
+	}*/
+	err := b.Websocket.Setup(&stream.WebsocketSetup{
+		ExchangeConfig: exch,
+		// DefaultURL:            binanceDefaultWebsocketURL,
+		// RunningURL:            ePoint,
+		Connector:    b.WsConnect,
+		Subscriber:   b.Subscribe,
+		Unsubscriber: b.Unsubscribe,
+		Features:     &b.Features.Supports.WebsocketCapabilities,
 		OrderbookBufferConfig: buffer.Config{
 			SortBuffer:            true,
 			SortBufferByUpdateIDs: true,
@@ -258,10 +257,15 @@ func (b *Binance) Setup(exch *config.Exchange) error {
 	}
 
 	err = b.Websocket.SetupNewConnection(&stream.ConnectionSetup{
+		URL:                  binanceDefaultWebsocketURL,
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
 		RateLimit:            request.NewWeightedRateLimitByDuration(250 * time.Millisecond),
-		MessageFilter:        asset.Spot,
+		Handler: func(_ context.Context, incoming []byte) error {
+			return b.wsHandleData(incoming)
+		},
+		GenerateSubscriptions: b.generateSubscriptions,
+		MessageFilter:         asset.Spot,
 	})
 	if err != nil {
 		return err
