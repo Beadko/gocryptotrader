@@ -260,7 +260,7 @@ type TickerStream struct {
 // LiquidationStream holds the liquidation stream data
 type LiquidationStream struct {
 	EventType string           `json:"e"`
-	EventTime time.Time        `json:"E"`
+	EventTime types.Time       `json:"E"`
 	Order     LiquidationOrder `json:"o"`
 }
 
@@ -276,7 +276,7 @@ type LiquidationOrder struct {
 	OrderStatus      string       `json:"X"`
 	LastFilledQty    types.Number `json:"l"`
 	AccumulatedQty   types.Number `json:"z"`
-	TradeTime        time.Time    `json:"T"`
+	TradeTime        types.Time   `json:"T"`
 }
 
 // HistoricalTrade holds recent trade data

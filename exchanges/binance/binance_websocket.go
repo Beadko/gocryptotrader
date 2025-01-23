@@ -438,18 +438,6 @@ func (b *Binance) wsHandleUFuturesData(respRaw []byte) error {
 		return fmt.Errorf("%s %s %s", b.Name, "EventMissing", string(respRaw))
 	}
 
-	symbol, err := jsonparser.GetUnsafeString(respRaw, "o", "s")
-	if err != nil {
-		return err
-	}
-	pair, isEnabled, err := b.MatchSymbolCheckEnabled(symbol, asset.USDTMarginedFutures, false)
-	if err != nil {
-		return err
-	}
-	if !isEnabled {
-		return nil
-	}
-
 	switch event {
 	case "forceOrder":
 		var liq LiquidationStream
@@ -459,28 +447,29 @@ func (b *Binance) wsHandleUFuturesData(respRaw []byte) error {
 				err)
 		}
 
+		symbol, err := jsonparser.GetUnsafeString(respRaw, "o", "s")
+		if err != nil {
+			return err
+		}
+		pair, isEnabled, err := b.MatchSymbolCheckEnabled(symbol, asset.Spot, false)
+		if err != nil {
+			return err
+		}
+		if !isEnabled {
+			return nil
+		}
+
 		resp := stream.LiquidationData{
-			Timestamp:            liq.EventTime,
-			Pair:                 pair,
-			Exchange:             b.Name,
-			Price:                liq.Order.Price.Float64(),
-			TimeInForce:          liq.Order.TimeInForce,
-			OriginalQuantity:     liq.Order.OriginalQuantity.Float64(),
-			AveragePrice:         liq.Order.AveragePrice.Float64(),
-			LastFilledQty:        liq.Order.LastFilledQty.Float64(),
-			FilledAccumulatedQty: liq.Order.AccumulatedQty.Float64(),
-			TradeTime:            liq.Order.TradeTime,
+			Timestamp:    liq.EventTime.Time(),
+			Pair:         pair,
+			Exchange:     b.Name,
+			Quantity:     liq.Order.OriginalQuantity.Float64(),
+			Price:        liq.Order.Price.Float64(),
+			AveragePrice: liq.Order.AveragePrice.Float64(),
 		}
 		if resp.Side, err = order.StringToOrderSide(liq.Order.Side); err != nil {
 			return err
 		}
-		if resp.OrderType, err = order.StringToOrderType(liq.Order.OrderType); err != nil {
-			return err
-		}
-		if resp.OrderStatus, err = order.StringToOrderStatus(liq.Order.OrderStatus); err != nil {
-			return err
-		}
-
 		b.Websocket.DataHandler <- resp
 		return nil
 

@@ -144,19 +144,13 @@ type KlineData struct {
 
 // LiquidationData defines liquidation feed
 type LiquidationData struct {
-	Timestamp            time.Time
-	Pair                 currency.Pair
-	Exchange             string
-	Side                 order.Side
-	OrderType            order.Type
-	TimeInForce          string
-	OriginalQuantity     float64
-	Price                float64
-	AveragePrice         float64
-	OrderStatus          order.Status
-	LastFilledQty        float64
-	FilledAccumulatedQty float64
-	TradeTime            time.Time
+	Timestamp    time.Time
+	Exchange     string
+	Pair         currency.Pair
+	Side         order.Side
+	Quantity     float64
+	Price        float64
+	AveragePrice float64
 }
 
 // WebsocketPositionUpdated reflects a change in orders/contracts on an exchange

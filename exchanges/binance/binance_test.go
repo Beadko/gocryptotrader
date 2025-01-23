@@ -2207,7 +2207,7 @@ func TestWSLiquidationUpdate(t *testing.T) {
 	testexch.FixtureToDataHandler(t, "testdata/wsLiquidationData.json", b.wsHandleUFuturesData)
 	close(b.Websocket.DataHandler)
 
-	expJSON := []string{`{"Timestamp":"2025-01-21 14:48:48.455 +0000 UTC","Pair":"BTCUSDT","Exchange":"Binance","Side":"SELL","OrderType":"LIMIT","TimeInForce":"IOC","OriginalQuantity":0.001,"Price":101440.98,"AveragePrice":101792.60,"OrderStatus":FILLED","LastFilledQty":0.001,"FilledAccumulatedQty":0.001,"TradeTime":" 2025-01-21 14:48:48.451 +0000 UTC"}`}
+	expJSON := []string{`{"Timestamp":"2025-01-21T13:35:28.455+07:00","Exchange":"Binance","Pair":"BTC-USDT","Side":"SELL","Quantity":0.001,"Price":101440.98,"AveragePrice":101792.6}`}
 	require.Len(t, b.Websocket.DataHandler, len(expJSON), "Must see correct number of liquidations")
 	for resp := range b.Websocket.DataHandler {
 		switch v := resp.(type) {
@@ -2215,7 +2215,7 @@ func TestWSLiquidationUpdate(t *testing.T) {
 			i := 0
 			exp := stream.LiquidationData{
 				Exchange: b.Name,
-				Pair:     currency.NewPair(currency.BTC, currency.USDT),
+				Pair:     currency.NewPairWithDelimiter("BTC", "USDT", "-"),
 			}
 			require.NoErrorf(t, json.Unmarshal([]byte(expJSON[i]), &exp), "Must not error unmarshalling json: %s", expJSON)
 			require.Equalf(t, exp, v, "Liquidation [%d] should be correct", i)
