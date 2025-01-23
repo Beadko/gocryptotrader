@@ -1081,6 +1081,7 @@ const subTplText = `
   {{ else if eq $c "allTrades" -}} trade
   {{ else if eq $c "candles"   -}} kline  {{- interval $.S }}
   {{ else if eq $c "orderbook" -}} depth  {{- levels $.S }}{{ interval $.S }}
+  {{ else if eq $c "liquidations" -}} forceOrder
   {{- end }}{{ end }}
   {{ $.PairSeparator }}
 {{end}}

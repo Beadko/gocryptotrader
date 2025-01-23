@@ -24,16 +24,17 @@ const (
 
 // Channel constants
 const (
-	TickerChannel    = "ticker"
-	OrderbookChannel = "orderbook"
-	CandlesChannel   = "candles"
-	AllOrdersChannel = "allOrders"
-	AllTradesChannel = "allTrades"
-	MyTradesChannel  = "myTrades"
-	MyOrdersChannel  = "myOrders"
-	MyWalletChannel  = "myWallet"
-	MyAccountChannel = "myAccount"
-	HeartbeatChannel = "heartbeat"
+	TickerChannel       = "ticker"
+	OrderbookChannel    = "orderbook"
+	CandlesChannel      = "candles"
+	AllOrdersChannel    = "allOrders"
+	AllTradesChannel    = "allTrades"
+	Liquidationschannel = "liquidations"
+	MyTradesChannel     = "myTrades"
+	MyOrdersChannel     = "myOrders"
+	MyWalletChannel     = "myWallet"
+	MyAccountChannel    = "myAccount"
+	HeartbeatChannel    = "heartbeat"
 )
 
 // Public errors

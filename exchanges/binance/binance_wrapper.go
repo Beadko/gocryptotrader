@@ -193,6 +193,7 @@ func (b *Binance) SetDefaults() {
 			{Enabled: true, Asset: asset.Spot, Channel: subscription.AllTradesChannel},
 			{Enabled: true, Asset: asset.Spot, Channel: subscription.CandlesChannel, Interval: kline.OneMin},
 			{Enabled: true, Asset: asset.Spot, Channel: subscription.OrderbookChannel, Interval: kline.HundredMilliseconds},
+			{Enabled: true, Asset: asset.USDTMarginedFutures, Channel: subscription.Liquidationschannel},
 		},
 	}
 
