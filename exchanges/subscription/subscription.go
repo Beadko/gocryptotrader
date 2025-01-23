@@ -29,7 +29,7 @@ const (
 	CandlesChannel      = "candles"
 	AllOrdersChannel    = "allOrders"
 	AllTradesChannel    = "allTrades"
-	Liquidationschannel = "liquidations"
+	LiquidationsChannel = "liquidations"
 	MyTradesChannel     = "myTrades"
 	MyOrdersChannel     = "myOrders"
 	MyWalletChannel     = "myWallet"

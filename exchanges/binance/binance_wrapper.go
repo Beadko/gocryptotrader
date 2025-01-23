@@ -193,7 +193,7 @@ func (b *Binance) SetDefaults() {
 			{Enabled: true, Asset: asset.Spot, Channel: subscription.AllTradesChannel},
 			{Enabled: true, Asset: asset.Spot, Channel: subscription.CandlesChannel, Interval: kline.OneMin},
 			{Enabled: true, Asset: asset.Spot, Channel: subscription.OrderbookChannel, Interval: kline.HundredMilliseconds},
-			{Enabled: true, Asset: asset.USDTMarginedFutures, Channel: subscription.Liquidationschannel},
+			{Enabled: true, Asset: asset.USDTMarginedFutures, Channel: subscription.LiquidationsChannel},
 		},
 	}
 
@@ -250,7 +250,8 @@ func (b *Binance) Setup(exch *config.Exchange) error {
 			SortBuffer:            true,
 			SortBufferByUpdateIDs: true,
 		},
-		TradeFeed: b.Features.Enabled.TradeFeed,
+		TradeFeed:                    b.Features.Enabled.TradeFeed,
+		UseMultiConnectionManagement: true,
 	})
 	if err != nil {
 		return err
@@ -260,6 +261,7 @@ func (b *Binance) Setup(exch *config.Exchange) error {
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
 		RateLimit:            request.NewWeightedRateLimitByDuration(250 * time.Millisecond),
+		MessageFilter:        asset.Spot,
 	})
 	if err != nil {
 		return err
@@ -270,7 +272,19 @@ func (b *Binance) Setup(exch *config.Exchange) error {
 		URL:                  uFuturesWebsocketURL,
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
-		MessageFilter:        asset.USDTMarginedFutures,
+		Handler: func(_ context.Context, incoming []byte) error {
+			return b.wsHandleUFuturesData(incoming)
+		},
+		Subscriber: func(_ context.Context, _ stream.Connection, sub subscription.List) error {
+			return b.Subscribe(sub)
+		},
+		Unsubscriber: func(_ context.Context, _ stream.Connection, sub subscription.List) error {
+			return b.Unsubscribe(sub)
+		},
+		GenerateSubscriptions:    b.GenerateUFuturesDefaultSubscriptions,
+		Connector:                b.WsUFuturesConnect,
+		MessageFilter:            asset.USDTMarginedFutures,
+		BespokeGenerateMessageID: b.Websocket.AuthConn.GenerateMessageID,
 	})
 }
 

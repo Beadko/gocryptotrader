@@ -666,6 +666,61 @@ func (b *Binance) manageSubs(op string, subs subscription.List) error {
 	return err
 }
 
+// GenerateUFuturesDefaultSubscriptions returns default subscriptions information.
+func (b *Binance) GenerateUFuturesDefaultSubscriptions() (subscription.List, error) {
+	liquidationsCh := "forceOrder"
+
+	pairs, err := b.GetEnabledPairs(asset.USDTMarginedFutures)
+	if err != nil {
+		if errors.Is(err, asset.ErrNotEnabled) {
+			return nil, nil // no enabled pairs, subscriptions require an associated pair.
+		}
+		return nil, err
+	}
+	var subscriptions subscription.List
+
+	for _, pair := range pairs {
+		fPair, err := b.FormatExchangeCurrency(pair, asset.Futures)
+		if err != nil {
+			return nil, err
+		}
+		subscriptions = append(subscriptions, &subscription.Subscription{
+			Channel: liquidationsCh,
+			Pairs:   currency.Pairs{fPair.Upper()},
+			Asset:   asset.USDTMarginedFutures,
+		})
+	}
+	return subscriptions, nil
+}
+
+// WsUFuturesConnect initiates a websocket connection for ufutures account
+func (b *Binance) WsUFuturesConnect(ctx context.Context, conn stream.Connection) error {
+	if !b.Websocket.IsEnabled() || !b.IsEnabled() {
+		return stream.ErrWebsocketNotEnabled
+	}
+	err := b.CurrencyPairs.IsAssetEnabled(asset.USDTMarginedFutures)
+	if err != nil {
+		return err
+	}
+	err = conn.DialContext(ctx, &websocket.Dialer{}, http.Header{})
+	if err != nil {
+		return fmt.Errorf("%v - Unable to connect to Websocket. Error: %s",
+			b.Name,
+			err)
+	}
+
+	conn.SetupPingHandler(request.Unset, stream.PingHandler{
+		UseGorillaHandler: true,
+		MessageType:       websocket.PongMessage,
+		Delay:             pingDelay,
+	})
+
+	b.Websocket.Wg.Add(1)
+	go b.wsReadData()
+
+	return nil
+}
+
 // ProcessUpdate processes the websocket orderbook update
 func (b *Binance) ProcessUpdate(cp currency.Pair, a asset.Item, ws *WebsocketDepthStream) error {
 	updateBid := make([]orderbook.Tranche, len(ws.UpdateBids))
