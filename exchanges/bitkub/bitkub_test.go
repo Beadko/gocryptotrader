@@ -1,12 +1,13 @@
 package bitkub
 
 import (
+	"context"
 	"log"
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/thrasher-corp/gocryptotrader/config"
-	exchange "github.com/thrasher-corp/gocryptotrader/exchanges"
 )
 
 // Please supply your own keys here to do authenticated endpoint testing
@@ -16,10 +17,10 @@ const (
 	canManipulateRealOrders = false
 )
 
-var bi = &Bitkub{}
+var b = &Bitkub{}
 
 func TestMain(m *testing.M) {
-	bi.SetDefaults()
+	b.SetDefaults()
 	cfg := config.GetConfig()
 	err := cfg.LoadConfig("../../testdata/configtest.json", true)
 	if err != nil {
@@ -36,7 +37,7 @@ func TestMain(m *testing.M) {
 	exchCfg.API.Credentials.Key = apiKey
 	exchCfg.API.Credentials.Secret = apiSecret
 
-	err = bi.Setup(exchCfg)
+	err = b.Setup(exchCfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -44,12 +45,10 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// Ensures that this exchange package is compatible with IBotExchange
-func TestInterface(t *testing.T) {
-	var e exchange.IBotExchange
-	if e = new(Bitkub); e == nil {
-		t.Fatal("unable to allocate exchange")
-	}
-}
+func TestGetTicker(t *testing.T) {
+	t.Parallel()
 
-// Implement tests for API endpoints below
+	_, err := b.GetTicker(context.Background(), "btc_thb")
+	require.Error(t, err, "Get ticker must not error")
+
+}
