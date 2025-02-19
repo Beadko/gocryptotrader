@@ -19,6 +19,7 @@ var Exchanges = []string{
 	"bitfinex",
 	"bithumb",
 	"bitflyer",
+	"bitkub",
 	"bitmex",
 	"bitstamp",
 	"btc markets",
