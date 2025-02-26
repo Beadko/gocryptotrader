@@ -33,46 +33,13 @@ func (bi *Bitkub) SetDefaults() {
 	bi.API.CredentialsValidator.RequiresKey = true
 	bi.API.CredentialsValidator.RequiresSecret = true
 
-	// If using only one pair format for request and configuration, across all
-	// supported asset types either SPOT and FUTURES etc. You can use the
-	// example below:
-
-	// Request format denotes what the pair as a string will be, when you send
-	// a request to an exchange.
-	requestFmt := &currency.PairFormat{ /*Set pair request formatting details here for e.g.*/ Uppercase: true, Delimiter: ":"}
-	// Config format denotes what the pair as a string will be, when saved to
-	// the config.json file.
-	configFmt := &currency.PairFormat{ /*Set pair request formatting details here*/ }
-	err := bi.SetGlobalPairsManager(requestFmt, configFmt /*multiple assets can be set here using the asset package ie asset.Spot*/)
+	requestFmt := &currency.PairFormat{Uppercase: false, Delimiter: "_"}
+	configFmt := &currency.PairFormat{Uppercase: true, Delimiter: currency.DashDelimiter}
+	err := bi.SetGlobalPairsManager(requestFmt, configFmt)
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)
 	}
 
-	// If assets require multiple differences in formatting for request and
-	// configuration, another exchange method can be be used e.g. futures
-	// contracts require a dash as a delimiter rather than an underscore. You
-	// can use this example below:
-
-	fmt1 := currency.PairStore{
-		RequestFormat: &currency.PairFormat{Uppercase: true},
-		ConfigFormat:  &currency.PairFormat{Uppercase: true},
-	}
-
-	fmt2 := currency.PairStore{
-		RequestFormat: &currency.PairFormat{Uppercase: true},
-		ConfigFormat:  &currency.PairFormat{Uppercase: true, Delimiter: ":"},
-	}
-
-	err = bi.StoreAssetPairFormat(asset.Spot, fmt1)
-	if err != nil {
-		log.Errorln(log.ExchangeSys, err)
-	}
-	err = bi.StoreAssetPairFormat(asset.Margin, fmt2)
-	if err != nil {
-		log.Errorln(log.ExchangeSys, err)
-	}
-
-	// Fill out the capabilities/features that the exchange supports
 	bi.Features = exchange.Features{
 		Supports: exchange.FeaturesSupported{
 			REST:      true,
@@ -80,10 +47,21 @@ func (bi *Bitkub) SetDefaults() {
 			RESTCapabilities: protocol.Features{
 				TickerFetching:    true,
 				OrderbookFetching: true,
+				TradeFetching:     true,
+				AccountBalance:    true,
+				SubmitOrder:       true,
+				CancelOrder:       true,
+				GetOrder:          true,
+				GetOrders:         true,
+				CryptoWithdrawal:  true,
+				DepositHistory:    true,
+				WithdrawalHistory: true,
+				FiatWithdraw:      true,
 			},
 			WebsocketCapabilities: protocol.Features{
 				TickerFetching:    true,
 				OrderbookFetching: true,
+				TradeFetching:     true,
 			},
 			WithdrawPermissions: exchange.AutoWithdrawCrypto |
 				exchange.AutoWithdrawFiat,
@@ -92,19 +70,21 @@ func (bi *Bitkub) SetDefaults() {
 			AutoPairUpdates: true,
 		},
 	}
-	// NOTE: SET THE EXCHANGES RATE LIMIT HERE
+
 	bi.Requester, err = request.New(bi.Name,
 		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
 	if err != nil {
 		log.Errorln(log.ExchangeSys, err)
 	}
 
-	// NOTE: SET THE URLs HERE
 	bi.API.Endpoints = bi.NewEndpoints()
-	bi.API.Endpoints.SetDefaultEndpoints(map[exchange.URL]string{
-		exchange.RestSpot: bitkubAPIURL,
-		// exchange.WebsocketSpot: bitkubWSAPIURL,
+	err = bi.API.Endpoints.SetDefaultEndpoints(map[exchange.URL]string{
+		exchange.RestSpot:      bitkubAPIURL,
+		exchange.WebsocketSpot: bitkubWSAPIURL,
 	})
+	if err != nil {
+		log.Errorln(log.ExchangeSys, err)
+	}
 	bi.Websocket = stream.NewWebsocket()
 	bi.WebsocketResponseMaxLimit = exchange.DefaultWebsocketResponseMaxLimit
 	bi.WebsocketResponseCheckTimeout = exchange.DefaultWebsocketResponseCheckTimeout
@@ -214,33 +194,33 @@ func (bi *Bitkub) UpdateTicker(ctx context.Context, p currency.Pair, assetType a
 func (bi *Bitkub) UpdateTickers(ctx context.Context, assetType asset.Item) error {
 	// NOTE: EXAMPLE FOR GETTING TICKER PRICE
 	/*
-		tick, err := bi.GetTickers()
-		if err != nil {
-			return err
-		}
-	    for y := range tick {
-	        cp, err := currency.NewPairFromString(tick[y].Symbol)
-	        if err != nil {
-	            return err
-	        }
-	        err = ticker.ProcessTicker(&ticker.Price{
-	            Last:         tick[y].LastPrice,
-	            High:         tick[y].HighPrice,
-	            Low:          tick[y].LowPrice,
-	            Bid:          tick[y].BidPrice,
-	            Ask:          tick[y].AskPrice,
-	            Volume:       tick[y].Volume,
-	            QuoteVolume:  tick[y].QuoteVolume,
-	            Open:         tick[y].OpenPrice,
-	            Close:        tick[y].PrevClosePrice,
-	            Pair:         cp,
-	            ExchangeName: b.Name,
-	            AssetType:    assetType,
-	        })
-	        if err != nil {
-	            return err
-	        }
-	    }
+			tick, err := bi.GetTickers()
+			if err != nil {
+				return err
+			}
+		    for y := range tick {
+		        cp, err := currency.NewPairFromString(tick[y].Symbol)
+		        if err != nil {
+		            return err
+		        }
+		        err = ticker.ProcessTicker(&ticker.Price{
+		            Last:         tick[y].LastPrice,
+		            High:         tick[y].HighPrice,
+		            Low:          tick[y].LowPrice,
+		            Bid:          tick[y].BidPrice,
+		            Ask:          tick[y].AskPrice,
+		            Volume:       tick[y].Volume,
+		            QuoteVolume:  tick[y].QuoteVolume,
+		            Open:         tick[y].OpenPrice,
+		            Close:        tick[y].PrevClosePrice,
+		            Pair:         cp,
+		            ExchangeName: b.Name,
+		            AssetType:    assetType,
+		        })
+		        if err != nil {
+		            return err
+		        }
+		    }
 	*/
 	return nil
 }

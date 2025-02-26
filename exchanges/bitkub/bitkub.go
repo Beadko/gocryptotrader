@@ -19,6 +19,7 @@ type Bitkub struct {
 const (
 	bitkubAPIURL     = "https://api.bitkub.com/api"
 	bitkubAPIVersion = "3"
+	bitkubWSAPIURL   = "wss://api.bitkub.com/websocket-api"
 
 	// Public endpoints
 	bitkubTicker     = "market/ticker"
